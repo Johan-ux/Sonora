@@ -1,0 +1,303 @@
+/* ========================================================================== */
+/* Descargador de Música — Estilos                                           */
+/* ========================================================================== */
+
+:root {
+    --bg: #0f0f0f;
+    --surface: #1a1a2e;
+    --surface-alt: #16213e;
+    --primary: #e94560;
+    --primary-hover: #ff6b81;
+    --accent: #0f3460;
+    --text: #eaeaea;
+    --text-muted: #8a8a9a;
+    --success: #2ecc71;
+    --error: #e74c3c;
+    --radius: 12px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+}
+
+.contenedor {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+/* Header */
+header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.subtitulo {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+/* Tarjetas */
+.tarjeta {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tarjeta h2 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+}
+
+/* Formulario */
+label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+}
+
+.hint {
+    font-weight: 400;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+textarea {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+    transition: border-color 0.2s;
+}
+
+textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.fila-opciones {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.campo {
+    flex-shrink: 0;
+}
+
+select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+button {
+    margin-left: auto;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.6rem 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+button:hover {
+    background: var(--primary-hover);
+}
+
+button:active {
+    transform: scale(0.97);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Progreso */
+.oculto {
+    display: none !important;
+}
+
+.item-progreso {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.item-progreso .fila-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.item-progreso .titulo {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80%;
+}
+
+.item-progreso .estado {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.barra-contenedor {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.barra {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.item-progreso.completado .barra {
+    background: var(--success);
+}
+
+.item-progreso.error .barra {
+    background: var(--error);
+}
+
+.item-progreso.error .estado {
+    color: var(--error);
+}
+
+.item-progreso.completado .estado {
+    color: var(--success);
+}
+
+/* Resumen */
+#resumen {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-weight: 600;
+    text-align: center;
+}
+
+#resumen.exito {
+    background: rgba(46, 204, 113, 0.15);
+    color: var(--success);
+}
+
+#resumen.parcial {
+    background: rgba(231, 76, 60, 0.15);
+    color: var(--error);
+}
+
+/* Lista de archivos */
+.archivo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg);
+    border-radius: 8px;
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+}
+
+.archivo .nombre {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70%;
+}
+
+.archivo a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.archivo a:hover {
+    color: var(--primary-hover);
+}
+
+.archivo .tamano {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+    flex-shrink: 0;
+}
+
+.vacio {
+    color: var(--text-muted);
+    text-align: center;
+    padding: 1rem;
+    font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 500px) {
+    .contenedor {
+        padding: 1rem 0.5rem;
+    }
+
+    .fila-opciones {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    button {
+        margin-left: 0;
+        justify-content: center;
+    }
+}
