@@ -1,76 +1,142 @@
-# 🎵 Descargador de Música Personal
+# 🎵 Mi Música — Descargador, reproductor y biblioteca de escritorio
 
-Descarga el **MP3 de mejor calidad** desde URLs de YouTube usando
-[`yt-dlp`](https://github.com/yt-dlp/yt-dlp). Incluye una **interfaz web
-moderna** con progreso en tiempo real y también una **CLI** para uso desde
-terminal. El audio se convierte a MP3 a **320 kbps (bitrate fijo)** con la
-**carátula** y los **metadatos** incrustados.
+**Mi Música** es una **app de escritorio** (ventana propia, no el navegador) para
+descargar música de YouTube a **MP3 de alta calidad** y reproducirla desde tu
+propia biblioteca local. Combina tres cosas en una sola ventana:
+
+- 🔎 **Buscador integrado** de YouTube (sin abrir el navegador ni iframes).
+- ⬇️ **Descargador** a MP3 (320 kbps por defecto, configurable) con **carátula**
+  y **metadatos** incrustados.
+- 🎧 **Reproductor + biblioteca** para escuchar lo que ya tienes descargado.
+
+Construida con **Python + Flask + pywebview** y empaquetable a un `.exe` con
+**PyInstaller**.
 
 > ⚠️ Proyecto de uso **personal y privado**. No es comercial.
 
-## Características
+---
 
-- 🌐 **Interfaz web** moderna (dark theme) con progreso en tiempo real (SSE).
-- ✅ Extracción a MP3 con **bitrate fijo de 320 kbps** (configurable).
-- 🖼️ Incrustación de **carátula** (thumbnail) y **metadatos** (título, artista…).
-- 🔁 **Continúa** si una URL falla; las fallidas se registran en un **log**.
-- 🍪 **Soporte de cookies** (fichero Netscape o exportadas del navegador) para
-  evitar bloqueos de YouTube.
-- 🧩 **CLI** completa con `argparse` (modo terminal).
-- 📂 **Gestión de descargas**: lista y descarga los MP3 desde el navegador.
+## ✨ Funciones
 
-## Requisitos
+- 🔎 **Buscador integrado**: busca por canción, artista o pega una URL/playlist.
+  Los resultados se muestran dentro de la propia app.
+- 📥 **Cola persistente**: añade canciones a una cola que **sobrevive al
+  reinicio** (se guarda en SQLite). Elige la carpeta de destino y la calidad.
+- 🎵 **Descarga a MP3**: bitrate configurable (128 / 192 / 256 / **320** kbps),
+  con **carátula** (thumbnail) y **metadatos** (título, artista…) incrustados.
+- 📚 **Biblioteca**: explora la música ya descargada; lee las etiquetas (título,
+  artista, álbum, duración) directamente de los ficheros.
+- ▶️ **Reproductor integrado**: barra de reproducción persistente con
+  play/pausa, anterior/siguiente, barra de búsqueda (seek) y volumen.
+- 🗂️ **Playlists / álbumes**: pega la URL de una playlist y añade **todo** a la
+  cola de una vez.
+- 🕑 **Historial** de descargas completadas.
 
-- **Python 3.9+**
-- **ffmpeg** instalado y disponible en el `PATH` (dependencia de sistema, **no**
-  se instala con pip).
+---
+
+## ✅ Requisitos
+
+- **Python 3.9+** (probado con Python 3.14 en Windows 11).
+- **ffmpeg** instalado (dependencia de **sistema**, no se instala con pip).
 
 ### Instalar ffmpeg
 
 ```bash
+# Windows (winget o Chocolatey)
+winget install Gyan.FFmpeg
+# choco install ffmpeg
+
 # Debian / Ubuntu
 sudo apt install ffmpeg
 
 # macOS (Homebrew)
 brew install ffmpeg
-
-# Windows (winget o Chocolatey)
-winget install Gyan.FFmpeg
-# choco install ffmpeg
 ```
 
-> **Windows (winget):** tras instalar ffmpeg, **reinicia la terminal / VS Code**
-> para que recargue el `PATH`. Si no quieres reiniciar, no pasa nada: el script
-> **autodetecta** ffmpeg en la ubicación de winget. También puedes indicar su
-> ruta a mano con `--ffmpeg`.
+> **Windows (winget):** tras instalar ffmpeg, **reinicia la terminal** para que
+> recargue el `PATH`. Si no quieres reiniciar, no pasa nada: la app
+> **autodetecta** ffmpeg en la ubicación de winget. La app es compatible con
+> Windows, pero también puedes ejecutarla en Linux/macOS desde el código fuente.
 
-## Instalación
+---
+
+## 📦 Instalación
 
 ```bash
-# 1) (Opcional pero recomendado) crear un entorno virtual
+# 1) (Recomendado) crear un entorno virtual
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+.venv\Scripts\activate        # Linux/macOS: source .venv/bin/activate
 
 # 2) Instalar las dependencias de Python
 pip install -r requirements.txt
 ```
 
-## Uso
+Dependencias principales (ver `requirements.txt`): `yt-dlp`, `flask`, `mutagen`
+y `pywebview`.
 
-### Interfaz web (recomendado)
+---
+
+## 🚀 Uso (desarrollo)
+
+La forma más sencilla en Windows es ejecutar el atajo:
 
 ```bash
-python app.py
+iniciar.bat
 ```
 
-Abre [http://localhost:5000](http://localhost:5000) en tu navegador. Desde ahí puedes:
+`iniciar.bat` activa el entorno virtual (`.venv`) y lanza la app. De forma
+equivalente, puedes ejecutarla directamente:
 
-1. **Pegar URLs** de YouTube (una por línea o separadas por comas).
-2. **Elegir el bitrate** (128, 192, 256 o 320 kbps).
-3. **Ver el progreso** en tiempo real con barras animadas.
-4. **Descargar los MP3** directamente desde la sección «Mis Descargas».
+```bash
+python desktop.py
+```
 
-### CLI (modo terminal)
+En ambos casos se abre la **ventana propia** de "🎵 Mi Música" (no el navegador).
+Por dentro, la app arranca un pequeño servidor Flask en `127.0.0.1` sobre un
+puerto libre y abre esa ventana con `pywebview`. Al cerrar la ventana, la app
+termina por completo.
+
+### De un vistazo
+
+- **Buscar**: escribe y pulsa Enter (o pega una URL/playlist). Pulsa **＋** para
+  añadir un resultado a la cola.
+- **Cola**: elige carpeta de destino (botón explorar) y calidad, y pulsa
+  **Descargar**. El progreso se actualiza en vivo.
+- **Biblioteca**: pulsa el botón de play de cualquier pista para escucharla; usa
+  anterior/siguiente para recorrer la lista.
+- **Historial**: consulta lo descargado anteriormente.
+
+---
+
+## 🏗️ Empaquetado a `.exe`
+
+Puedes generar un ejecutable de Windows con **PyInstaller** (se instala aparte;
+**no** está en `requirements.txt`):
+
+```bash
+construir_exe.bat
+```
+
+`construir_exe.bat` instala PyInstaller si falta y ejecuta:
+
+```bash
+python -m PyInstaller mi_musica.spec --noconfirm
+```
+
+El resultado queda en `dist/` (por ejemplo `dist/Mi Musica/Mi Musica.exe`). Esa
+carpeta es autocontenida: copia la carpeta `dist/Mi Musica/` a donde quieras y
+ejecuta el `.exe`. La música descargada y la base de datos se guardan **junto al
+ejecutable** (carpeta `descargas/` y fichero `biblioteca.db`).
+
+> Recuerda que **ffmpeg sigue siendo necesario** en el sistema (o autodetectable)
+> también para el ejecutable empaquetado.
+
+---
+
+## 🖥️ CLI (modo terminal)
+
+El script original de línea de comandos **`descargar_musica.py` sigue disponible**
+y plenamente funcional si prefieres descargar desde la terminal sin abrir la app:
 
 1. Crea tu fichero de URLs a partir del ejemplo:
 
@@ -109,11 +175,13 @@ Consulta la ayuda completa con:
 python descargar_musica.py --help
 ```
 
-## Cookies (evitar bloqueos de YouTube)
+---
+
+## 🍪 Cookies (evitar bloqueos de YouTube)
 
 Cuando se descarga desde la IP de un servidor, YouTube puede pedir verificación
 («Sign in to confirm you're not a bot»). Las cookies de una sesión autenticada
-suelen resolverlo. Hay dos formas de pasarlas:
+suelen resolverlo. Hay dos formas de pasarlas (desde la **CLI**):
 
 - **Fichero de cookies (Netscape):** expórtalas con una extensión del navegador
   (p. ej. *Get cookies.txt*) y pásalo con:
@@ -132,19 +200,51 @@ suelen resolverlo. Hay dos formas de pasarlas:
 > ⚠️ El fichero de cookies contiene credenciales de sesión: trátalo como
 > información sensible y **no lo subas al repositorio** (ya está en `.gitignore`).
 
-## Descargas fallidas
+---
 
-Si alguna URL falla, el proceso continúa con el resto y registra el fallo en el
-log (por defecto `<salida>/descargas_fallidas.log`). Cada línea tiene el formato:
+## 📁 Estructura del proyecto
 
+La app está organizada como un **paquete de Python** siguiendo el patrón
+*application factory + blueprints* de Flask, con capas bien separadas:
+
+```text
+mi_musica/                 Paquete principal de la app de escritorio
+├── factory.py             crear_app() + preparar() (ensamblaje de la app)
+├── paths.py               Rutas de datos/recursos y validación anti path-traversal
+├── ffmpeg.py              Localización de ffmpeg (compartida con la CLI)
+├── utils.py               Utilidades varias (sin dependencias de Flask)
+├── db.py                  Persistencia en SQLite (cola, historial, configuración)
+├── sse.py                 Difusión de eventos en tiempo real (Server-Sent Events)
+├── servicios/             Lógica de negocio
+│   ├── youtube.py         Búsqueda, información y expansión de playlists (yt-dlp)
+│   ├── descargas.py       Worker de descarga a MP3 + cola con progreso
+│   └── biblioteca.py      Escaneo de la música descargada + tags (mutagen)
+├── api/                   Blueprints HTTP (rutas de la API)
+│   ├── vistas.py          /
+│   ├── busqueda.py        /api/buscar, /api/info, /api/playlist
+│   ├── cola.py            /api/cola*, /api/historial
+│   ├── eventos.py         /api/eventos (SSE)
+│   ├── biblioteca.py      /api/biblioteca, /audio, /descargas, /api/abrir-carpeta
+│   ├── carpetas.py        /api/carpetas*
+│   └── config.py          /api/config
+├── templates/index.html   Interfaz (HTML)
+└── static/css, static/js  Estilos y lógica de frontend
+
+desktop.py                 Punto de entrada de la app de escritorio (pywebview)
+descargar_musica.py        CLI independiente (importa la localización de ffmpeg)
+mi_musica.spec             Configuración de PyInstaller para empaquetar
+construir_exe.bat          Genera el .exe con PyInstaller
+iniciar.bat                Atajo de desarrollo (activa .venv y lanza la app)
+requirements.txt           Dependencias de Python
 ```
-<timestamp ISO-8601>	<url>	<mensaje de error>
-```
 
-El programa devuelve código de salida `1` si hubo al menos un fallo, `0` si todo
-fue bien, y `2` ante errores de configuración (fichero inexistente, sin URLs…).
+La música se descarga en `descargas/` y la base de datos es `biblioteca.db`,
+ambas junto a la app (en desarrollo, en la raíz del proyecto; empaquetada, junto
+al ejecutable).
 
-## Aviso legal
+---
+
+## 📄 Aviso legal
 
 Usa esta herramienta únicamente con contenido para el que tengas derechos o
 permiso, y respeta los Términos de Servicio de YouTube y la legislación

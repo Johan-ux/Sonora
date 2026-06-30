@@ -1,0 +1,1329 @@
+/* ==========================================================================
+   Mi Música — hoja de estilos
+   --------------------------------------------------------------------------
+   Tema CLARO, moderno, tipo reproductor de música premium (estética
+   Apple Music / Spotify en modo claro): superficies blancas sobre un fondo
+   gris muy claro, bordes finos de 1px, sombras suaves para la elevación
+   (nada de "glow"), y un acento violeta vibrante con buen contraste.
+
+   Entorno: app de escritorio sobre WebView2 (Chromium en Windows 11).
+   Es un único navegador moderno, así que se usa CSS de vanguardia sin
+   fallbacks (color-scheme, accent-color, :has, scrollbar-gutter, etc.).
+   Los únicos prefijos -webkit-* presentes son los pseudo-elementos de
+   range y scrollbar que Chromium sí requiere.
+
+   Clases e IDs según el contrato del DOM (no se inventan nombres). El JS
+   fija la custom property `--progreso` en los range; la vista activa lleva
+   `.activa` y el botón de nav activo lleva `.activo`.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Tokens de diseño
+   -------------------------------------------------------------------------- */
+:root {
+    /* Esquema de color claro: controles nativos, scrollbars y form controls
+       renderizan en variante clara. */
+    color-scheme: light;
+
+    /* Superficies */
+    --fondo:         #f4f5f8;   /* fondo de la app, gris muy claro y frío */
+    --superficie:    #ffffff;   /* sidebar, tarjetas, barra del reproductor */
+    --superficie-2:  #eef0f4;   /* inputs, hovers suaves */
+    --borde:         #e3e5ec;
+
+    /* Texto */
+    --texto:         #181a1f;
+    --texto-tenue:   #6a6f7b;
+
+    /* Acento violeta vibrante (contraste AA sobre blanco) */
+    --acento:        #6c4cff;
+    --acento-fuerte: #5a3ae6;
+    --acento-tenue:  rgba(108, 76, 255, 0.12);
+    --acento-suave:  rgba(108, 76, 255, 0.06);
+
+    /* Estados */
+    --exito:         #16a866;
+    --exito-tenue:   rgba(22, 168, 102, 0.12);
+    --error:         #e5484d;
+    --error-tenue:   rgba(229, 72, 77, 0.10);
+
+    /* Carril sin rellenar de los range */
+    --pista:         #e3e5ec;
+
+    /* Sombras suaves de elevación (claro, sin glow) */
+    --sombra-sm: 0 1px 2px rgba(20, 22, 40, 0.06), 0 1px 3px rgba(20, 22, 40, 0.05);
+    --sombra:    0 6px 20px rgba(20, 22, 40, 0.08);
+    --sombra-lg: 0 12px 34px rgba(20, 22, 40, 0.14);
+
+    /* Radios */
+    --radio:    14px;
+    --radio-sm: 9px;
+    --radio-lg: 20px;
+
+    /* Dimensiones de layout */
+    --sidebar-ancho: 220px;
+    --player-alto:   84px;
+
+    /* Movimiento */
+    --trans:      150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --trans-lenta: 260ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --------------------------------------------------------------------------
+   2. Reset y bases
+   -------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    /* Tipografía de sistema; el acento tiñe los controles nativos
+       (p. ej. el <select> de calidad y los checkboxes/radios que aparezcan). */
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    accent-color: var(--acento);
+    background: var(--fondo);
+    color: var(--texto);
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* App de escritorio: el body no hace scroll, lo hace .main. */
+    overflow: hidden;
+}
+
+button {
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+input,
+select {
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+}
+
+img {
+    display: block;
+    max-width: 100%;
+}
+
+a {
+    color: var(--acento);
+    text-decoration: none;
+}
+a:hover {
+    color: var(--acento-fuerte);
+}
+
+h1, h2, h3 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+}
+
+/* Foco accesible y visible en toda la app */
+:focus-visible {
+    outline: 2px solid var(--acento);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Scrollbar fino y claro (Chromium) */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #c9cdd8 transparent;
+}
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+    background: #cfd3dd;
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+    background: #b6bbc9;
+    background-clip: content-box;
+}
+
+/* --------------------------------------------------------------------------
+   3. Utilidades
+   -------------------------------------------------------------------------- */
+.oculto {
+    display: none !important;
+}
+
+.texto-muted {
+    color: var(--texto-tenue);
+}
+
+.texto-centro {
+    text-align: center;
+    padding: 48px 20px;
+}
+
+/* Estados de carga / vacío: mensaje tenue centrado */
+.cargando,
+.vacio {
+    text-align: center;
+    color: var(--texto-tenue);
+    padding: 52px 20px;
+    font-size: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   4. Aviso de ffmpeg ausente (banner de advertencia, lo muestra/oculta el JS)
+   -------------------------------------------------------------------------- */
+.aviso-ffmpeg {
+    margin: 0 0 18px;
+    padding: 13px 16px;
+    border-radius: var(--radio-sm);
+    background: var(--error-tenue);
+    border: 1px solid var(--error);
+    color: var(--error);
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+.aviso-ffmpeg strong {
+    font-weight: 700;
+}
+.aviso-ffmpeg code {
+    background: rgba(229, 72, 77, 0.14);
+    padding: 1px 7px;
+    border-radius: 6px;
+    font-size: 0.88em;
+    font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+}
+
+/* --------------------------------------------------------------------------
+   5. Layout principal — grid .app
+   Columnas: sidebar | 1fr. Filas: 1fr (contenido) | auto (reproductor).
+   El reproductor abarca ambas columnas en la fila 2.
+   -------------------------------------------------------------------------- */
+.app {
+    display: grid;
+    grid-template-columns: var(--sidebar-ancho) 1fr;
+    grid-template-rows: 1fr auto;
+    grid-template-areas:
+        "sidebar main"
+        "reproductor reproductor";
+    height: 100dvh;
+    width: 100vw;
+}
+
+/* --------------------------------------------------------------------------
+   6. Sidebar
+   -------------------------------------------------------------------------- */
+.sidebar {
+    grid-area: sidebar;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 20px 14px;
+    background: var(--superficie);
+    border-right: 1px solid var(--borde);
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+
+.sidebar-logo {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    padding: 6px 12px 20px;
+    color: var(--texto);
+    user-select: none;
+    white-space: nowrap;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Botón de navegación: icono + texto (+ badge en el de cola) */
+.nav-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: var(--radio-sm);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--texto-tenue);
+    text-align: left;
+    transition: background var(--trans), color var(--trans);
+}
+.nav-btn:hover {
+    background: var(--superficie-2);
+    color: var(--texto);
+}
+
+.nav-icono {
+    font-size: 16px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.nav-texto {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Estado activo: fondo de acento tenue, texto/acento en violeta y barrita
+   lateral. OJO: la clase es `activo` (no "activa"). */
+.nav-btn.activo {
+    background: var(--acento-tenue);
+    color: var(--acento);
+    font-weight: 600;
+}
+.nav-btn.activo::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 18px;
+    border-radius: 0 3px 3px 0;
+    background: var(--acento);
+}
+
+/* Badge de la cola (cápsula de acento con número).
+   El JS la oculta cuando está vacía: no se fuerza display aquí. */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--acento);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* --------------------------------------------------------------------------
+   7. Main + vistas
+   -------------------------------------------------------------------------- */
+.main {
+    grid-area: main;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    padding: 28px 34px 40px;
+}
+
+/* Solo una .vista lleva .activa a la vez */
+.vista {
+    display: none;
+    animation: aparecer-vista var(--trans-lenta);
+}
+.vista.activa {
+    display: block;
+}
+
+@keyframes aparecer-vista {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Cabecera de vista con su título (h1) */
+.vista-cabecera {
+    margin-bottom: 20px;
+}
+.vista-titulo {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--texto);
+}
+
+/* --------------------------------------------------------------------------
+   8. Controles base (inputs de texto, selects, botones)
+   -------------------------------------------------------------------------- */
+input[type="text"],
+input[type="search"],
+select,
+.input-buscar,
+#input-nueva-carpeta {
+    width: 100%;
+    background: var(--superficie-2);
+    border: 1px solid transparent;
+    border-radius: var(--radio-sm);
+    padding: 11px 14px;
+    color: var(--texto);
+    transition: background var(--trans), border-color var(--trans), box-shadow var(--trans);
+}
+input[type="text"]::placeholder,
+input[type="search"]::placeholder,
+.input-buscar::placeholder,
+#input-nueva-carpeta::placeholder {
+    color: var(--texto-tenue);
+}
+input[type="text"]:focus,
+input[type="search"]:focus,
+select:focus,
+.input-buscar:focus,
+#input-nueva-carpeta:focus {
+    outline: none;
+    background: var(--superficie);
+    border-color: var(--acento);
+    box-shadow: 0 0 0 3px var(--acento-tenue);
+}
+
+/* Select con flecha propia (mantiene look claro coherente) */
+select {
+    width: auto;
+    cursor: pointer;
+    appearance: none;
+    padding-right: 34px;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--texto-tenue) 50%),
+        linear-gradient(135deg, var(--texto-tenue) 50%, transparent 50%);
+    background-position:
+        calc(100% - 17px) center,
+        calc(100% - 12px) center;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+}
+
+/* --- Botones --- */
+
+/* Primario: fondo de acento, texto blanco */
+.btn-primario {
+    background: var(--acento);
+    color: #ffffff;
+    font-weight: 600;
+    padding: 11px 18px;
+    border-radius: var(--radio-sm);
+    transition: background var(--trans), transform var(--trans), box-shadow var(--trans);
+}
+.btn-primario:hover {
+    background: var(--acento-fuerte);
+}
+.btn-primario:active {
+    transform: translateY(1px);
+}
+
+/* Secundario: superficie con borde */
+.btn-secundario {
+    background: var(--superficie);
+    border: 1px solid var(--borde);
+    color: var(--texto);
+    font-weight: 500;
+    padding: 10px 16px;
+    border-radius: var(--radio-sm);
+    transition: background var(--trans), border-color var(--trans);
+}
+.btn-secundario:hover {
+    background: var(--superficie-2);
+}
+
+/* Acento: outline de acento (variante alternativa al primario) */
+.btn-acento {
+    background: var(--acento-suave);
+    border: 1px solid var(--acento);
+    color: var(--acento);
+    font-weight: 600;
+    padding: 10px 16px;
+    border-radius: var(--radio-sm);
+    transition: background var(--trans), color var(--trans);
+}
+.btn-acento:hover {
+    background: var(--acento);
+    color: #ffffff;
+}
+
+/* Buscar: como primario */
+.btn-buscar {
+    background: var(--acento);
+    color: #ffffff;
+    font-weight: 600;
+    padding: 0 22px;
+    border-radius: var(--radio-sm);
+    transition: background var(--trans), transform var(--trans);
+}
+.btn-buscar:hover {
+    background: var(--acento-fuerte);
+}
+.btn-buscar:active {
+    transform: translateY(1px);
+}
+
+/* Iconos fantasma (btn-icono / btn-cerrar) */
+.btn-icono,
+.btn-cerrar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    color: var(--texto-tenue);
+    background: transparent;
+    transition: background var(--trans), color var(--trans);
+}
+.btn-icono:hover,
+.btn-cerrar:hover {
+    background: var(--superficie-2);
+    color: var(--texto);
+}
+
+/* Estados deshabilitados comunes a todos los botones */
+.btn-primario:disabled,
+.btn-secundario:disabled,
+.btn-acento:disabled,
+.btn-buscar:disabled,
+.btn-icono:disabled,
+.btn-cerrar:disabled,
+button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   9. Buscador (Buscar y Biblioteca comparten .buscador + .input-buscar)
+   -------------------------------------------------------------------------- */
+.buscador {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 22px;
+}
+.input-buscar {
+    flex: 1;
+    font-size: 15px;
+    padding: 13px 16px;
+}
+
+/* --------------------------------------------------------------------------
+   10. Resultados de búsqueda (filas limpias, no grid de tarjetas)
+   -------------------------------------------------------------------------- */
+.resultados-busqueda {
+    min-width: 0;
+}
+.grid-resultados {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Cabecera de playlist: título + "Añadir todo" */
+.cabecera-playlist {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    background: var(--acento-suave);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+}
+.cabecera-playlist-info {
+    min-width: 0;
+}
+.cabecera-playlist h3 {
+    font-size: 16px;
+    font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cabecera-playlist-sub {
+    display: block;
+    font-size: 12.5px;
+    color: var(--texto-tenue);
+    margin-top: 2px;
+}
+
+/* Cada resultado es una fila blanca sobre el fondo gris */
+.resultado {
+    display: grid;
+    grid-template-columns: 68px 1fr auto;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 12px;
+    border-radius: var(--radio);
+    background: var(--superficie);
+    border: 1px solid var(--borde);
+    box-shadow: var(--sombra-sm);
+    transition: box-shadow var(--trans), transform var(--trans), border-color var(--trans);
+}
+.resultado:hover {
+    box-shadow: var(--sombra);
+    transform: translateY(-1px);
+    border-color: #d6d9e3;
+}
+
+/* Miniatura 16:9 pequeña; .sin-thumb = placeholder gris */
+.resultado-thumb {
+    width: 68px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: var(--radio-sm);
+    background: var(--superficie-2);
+}
+.resultado-thumb.sin-thumb,
+.sin-thumb {
+    background: var(--superficie-2);
+    border: 1px solid var(--borde);
+}
+
+.resultado-info {
+    min-width: 0;
+}
+.resultado-titulo {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--texto);
+    /* Trunca a 2 líneas */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.resultado-meta {
+    color: var(--texto-tenue);
+    font-size: 12.5px;
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.resultado-meta .dur {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Control de añadir: botón "＋" redondo de acento (cuando se puede añadir) */
+.btn-add-cola {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 1;
+    background: var(--acento-tenue);
+    color: var(--acento);
+    transition: background var(--trans), color var(--trans), transform var(--trans);
+}
+.btn-add-cola:hover {
+    background: var(--acento);
+    color: #ffffff;
+    transform: scale(1.06);
+}
+.btn-add-cola:active {
+    transform: scale(0.95);
+}
+
+/* Píldoras no interactivas: la canción YA está añadida/descargada */
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    user-select: none;
+}
+.pill-en-cola {
+    background: var(--acento-tenue);
+    color: var(--acento);
+}
+.pill-descargado {
+    background: var(--exito-tenue);
+    color: var(--exito);
+}
+
+/* --------------------------------------------------------------------------
+   11. Vista Cola
+   -------------------------------------------------------------------------- */
+.cola-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    background: var(--superficie);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+    box-shadow: var(--sombra-sm);
+}
+
+/* Bloque de destino: etiqueta + chip de ruta + Explorar */
+.cola-destino {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+.cola-etiqueta {
+    color: var(--texto-tenue);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Chip monospace con la ruta de destino */
+.ruta-texto {
+    display: inline-block;
+    max-width: 240px;
+    padding: 5px 10px;
+    border-radius: var(--radio-sm);
+    background: var(--superficie-2);
+    color: var(--texto);
+    font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Bloque de controles de descarga */
+.cola-controles {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+.select-bitrate {
+    padding: 9px 30px 9px 12px;
+}
+
+/* Lista de la cola */
+.lista-cola {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Cada ítem de la cola es una fila blanca elevada */
+.item-cola {
+    display: grid;
+    grid-template-columns: 68px 1fr auto;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 14px;
+    border-radius: var(--radio);
+    background: var(--superficie);
+    border: 1px solid var(--borde);
+    box-shadow: var(--sombra-sm);
+    transition: border-color var(--trans), box-shadow var(--trans);
+}
+
+.item-cola-thumb {
+    width: 68px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: var(--radio-sm);
+    background: var(--superficie-2);
+}
+.item-cola-thumb.sin-thumb {
+    border: 1px solid var(--borde);
+}
+
+.item-cola-info {
+    min-width: 0;
+}
+.item-cola-titulo {
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.item-cola-meta {
+    color: var(--texto-tenue);
+    font-size: 12.5px;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Barra de progreso del ítem (pista fina + relleno de acento) */
+.barra-contenedor {
+    grid-column: 1 / -1;
+    height: 5px;
+    margin-top: 8px;
+    border-radius: 999px;
+    background: var(--pista);
+    overflow: hidden;
+}
+.barra {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: var(--acento);
+    transition: width var(--trans-lenta) ease;
+}
+
+/* Estados del ítem de cola */
+.item-cola.descargando {
+    border-color: var(--acento);
+    box-shadow: 0 0 0 1px var(--acento-tenue), var(--sombra-sm);
+}
+.item-cola.completado {
+    border-color: var(--exito);
+    background: var(--exito-tenue);
+}
+.item-cola.completado .item-cola-meta {
+    color: var(--exito);
+}
+.item-cola.error {
+    border-color: var(--error);
+    background: var(--error-tenue);
+}
+.item-cola.error .item-cola-meta {
+    color: var(--error);
+}
+
+/* Botón ✕ para eliminar el ítem (fantasma, hover a error) */
+.item-cola-eliminar {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    font-size: 15px;
+    color: var(--texto-tenue);
+    background: transparent;
+    transition: background var(--trans), color var(--trans);
+}
+.item-cola-eliminar:hover {
+    background: var(--error-tenue);
+    color: var(--error);
+}
+
+/* --------------------------------------------------------------------------
+   12. Vista Biblioteca — lista de tracks
+   -------------------------------------------------------------------------- */
+.lista-biblioteca {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Cada track es una fila; el play se tiñe de acento al hover */
+.track {
+    display: grid;
+    grid-template-columns: 40px 1fr auto auto;
+    align-items: center;
+    gap: 14px;
+    padding: 9px 12px;
+    border-radius: var(--radio);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background var(--trans), border-color var(--trans);
+}
+.track:hover,
+.track:focus-visible {
+    background: var(--superficie);
+    border-color: var(--borde);
+    box-shadow: var(--sombra-sm);
+    outline: none;
+}
+
+/* Botón redondo de play del track */
+.btn-play-track {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 14px;
+    background: var(--superficie-2);
+    color: var(--texto-tenue);
+    transition: background var(--trans), color var(--trans), transform var(--trans);
+}
+.track:hover .btn-play-track {
+    background: var(--acento-tenue);
+    color: var(--acento);
+}
+.btn-play-track:hover {
+    background: var(--acento);
+    color: #ffffff;
+    transform: scale(1.05);
+}
+.btn-play-track:active {
+    transform: scale(0.95);
+}
+
+.track-info {
+    min-width: 0;
+}
+.track-titulo {
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.track-meta {
+    color: var(--texto-tenue);
+    font-size: 12.5px;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Duración a la derecha (estilo YouTube Music) */
+.track-dur {
+    color: var(--texto-tenue);
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    min-width: 38px;
+    text-align: right;
+}
+
+/* Botón "abrir carpeta": aparece al pasar el ratón por la fila */
+.track-carpeta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    font-size: 15px;
+    color: var(--texto-tenue);
+    opacity: 0;
+    transition: background var(--trans), color var(--trans), opacity var(--trans);
+}
+.track:hover .track-carpeta,
+.track:focus-visible .track-carpeta,
+.track-carpeta:focus-visible {
+    opacity: 1;
+}
+.track-carpeta:hover {
+    background: var(--superficie-2);
+    color: var(--acento);
+}
+
+/* --------------------------------------------------------------------------
+   13. Vista Historial
+   -------------------------------------------------------------------------- */
+.lista-historial {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.hist-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 14px;
+    border-radius: var(--radio);
+    border: 1px solid transparent;
+    transition: background var(--trans), border-color var(--trans);
+}
+.hist-item:hover {
+    background: var(--superficie);
+    border-color: var(--borde);
+    box-shadow: var(--sombra-sm);
+}
+.hist-info {
+    min-width: 0;
+}
+.hist-titulo {
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.hist-meta {
+    color: var(--texto-tenue);
+    font-size: 12.5px;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Botón ▶ opcional para volver a reproducir desde el historial */
+.hist-reproducir {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 13px;
+    background: var(--acento-tenue);
+    color: var(--acento);
+    transition: background var(--trans), color var(--trans), transform var(--trans);
+}
+.hist-reproducir:hover {
+    background: var(--acento);
+    color: #ffffff;
+    transform: scale(1.05);
+}
+.hist-reproducir:active {
+    transform: scale(0.95);
+}
+
+/* --------------------------------------------------------------------------
+   14. Barra de reproductor (fija abajo, a lo ancho; oculta hasta el 1er play)
+   -------------------------------------------------------------------------- */
+.reproductor {
+    grid-area: reproductor;
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(320px, 2fr) minmax(150px, 1fr);
+    align-items: center;
+    gap: 20px;
+    height: var(--player-alto);
+    padding: 0 24px;
+    background: var(--superficie);
+    border-top: 1px solid var(--borde);
+    /* Sombra suave hacia arriba */
+    box-shadow: var(--sombra-lg);
+}
+
+/* Zona izquierda: carátula + textos */
+.player-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+.player-thumb {
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
+    border-radius: var(--radio-sm);
+    object-fit: cover;
+    background: var(--superficie-2);
+}
+.player-textos {
+    min-width: 0;
+}
+.player-titulo {
+    font-weight: 600;
+    font-size: 13.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.player-artista {
+    color: var(--texto-tenue);
+    font-size: 12px;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Zona central: botones + barra de seek */
+.player-controles {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+.player-botones {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* Botones redondos del reproductor (anterior / play / siguiente) */
+.btn-redondo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 15px;
+    color: var(--texto-tenue);
+    background: transparent;
+    transition: background var(--trans), color var(--trans), transform var(--trans);
+}
+.btn-redondo:hover {
+    background: var(--superficie-2);
+    color: var(--texto);
+}
+.btn-redondo:active {
+    transform: scale(0.92);
+}
+
+/* El play central, más grande y con fondo de acento */
+.btn-play {
+    width: 44px;
+    height: 44px;
+    font-size: 17px;
+    background: var(--acento);
+    color: #ffffff;
+    box-shadow: var(--sombra-sm);
+}
+.btn-play:hover {
+    background: var(--acento-fuerte);
+    color: #ffffff;
+    transform: scale(1.05);
+}
+.btn-play:active {
+    transform: scale(0.96);
+}
+
+/* Fila de la barra: tiempo + seek + duración */
+.player-barra {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 560px;
+}
+.player-tiempo {
+    color: var(--texto-tenue);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    min-width: 38px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* Zona derecha: volumen */
+.player-volumen-cont {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+}
+.player-volumen-icono {
+    color: var(--texto-tenue);
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+/* --------------------------------------------------------------------------
+   15. Range a medida: #player-seek y #player-volumen (Chromium)
+   El JS fija `--progreso` (p. ej. 42%): la parte rellena va en acento y el
+   resto en --pista mediante un linear-gradient como fondo de la pista.
+   -------------------------------------------------------------------------- */
+.player-seek,
+.player-volumen {
+    appearance: none;
+    height: 6px;
+    border-radius: 999px;
+    cursor: pointer;
+    background: linear-gradient(
+        to right,
+        var(--acento) var(--progreso, 0%),
+        var(--pista) var(--progreso, 0%)
+    );
+}
+
+/* El seek ocupa el espacio flexible; el volumen es corto */
+.player-seek {
+    flex: 1;
+}
+.player-volumen {
+    width: 100px;
+    flex-shrink: 0;
+}
+
+/* Thumb (Chromium) */
+.player-seek::-webkit-slider-thumb,
+.player-volumen::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--acento);
+    border: 2px solid #ffffff;
+    box-shadow: var(--sombra-sm);
+    transition: transform var(--trans);
+}
+.player-seek:hover::-webkit-slider-thumb,
+.player-volumen:hover::-webkit-slider-thumb,
+.player-seek:active::-webkit-slider-thumb,
+.player-volumen:active::-webkit-slider-thumb {
+    transform: scale(1.18);
+}
+
+/* --------------------------------------------------------------------------
+   16. Overlay explorador de carpetas
+   -------------------------------------------------------------------------- */
+.overlay-carpetas {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(20, 22, 40, 0.42);
+    backdrop-filter: blur(3px);
+    animation: aparecer-overlay var(--trans);
+}
+@keyframes aparecer-overlay {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Panel: tarjeta blanca elevada */
+.panel-carpetas {
+    width: min(520px, 100%);
+    max-height: min(640px, 90dvh);
+    display: flex;
+    flex-direction: column;
+    background: var(--superficie);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-lg);
+    box-shadow: var(--sombra-lg);
+    overflow: hidden;
+    animation: subir-panel var(--trans-lenta);
+}
+@keyframes subir-panel {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.panel-carpetas-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--borde);
+}
+.panel-carpetas-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+}
+
+/* Navegación: subir + ruta actual */
+.carpetas-navegacion {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--borde);
+}
+.carpetas-navegacion .ruta-texto {
+    flex: 1;
+    max-width: none;
+}
+
+/* Formulario para crear una subcarpeta */
+.form-nueva-carpeta {
+    display: flex;
+    gap: 8px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--borde);
+}
+#input-nueva-carpeta {
+    flex: 1;
+}
+
+/* Lista de subcarpetas (scroll propio) */
+.lista-carpetas {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 120px;
+}
+
+/* Cada carpeta es un botón-fila: icono 📁 + nombre */
+.carpeta-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: var(--radio-sm);
+    text-align: left;
+    color: var(--texto);
+    transition: background var(--trans);
+}
+.carpeta-item:hover {
+    background: var(--superficie-2);
+}
+.carpeta-icono {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+/* Pie del overlay: seleccionar destino (primario ancho) */
+.carpetas-acciones {
+    padding: 14px 20px;
+    border-top: 1px solid var(--borde);
+}
+.btn-seleccionar {
+    width: 100%;
+    padding: 12px;
+}
+
+/* --------------------------------------------------------------------------
+   17. Accesibilidad — reducir movimiento
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+    /* Sin micro-elevaciones ni escalados al interactuar */
+    .resultado:hover,
+    .btn-add-cola:hover,
+    .btn-play-track:hover,
+    .btn-play:hover,
+    .hist-reproducir:hover,
+    .player-seek:hover::-webkit-slider-thumb,
+    .player-volumen:hover::-webkit-slider-thumb {
+        transform: none;
+    }
+}

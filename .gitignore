@@ -1,0 +1,44 @@
+# ───────────────────────────── Python ─────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# ─────────────────────── Empaquetado (PyInstaller) ───────────────────────
+build/
+dist/
+# Nota: mi_musica.spec SÍ se versiona (NO se ignora).
+
+# ───────────────────────── Datos locales / generados ─────────────────────
+descargas/
+*.mp3
+
+# Base de datos SQLite (y ficheros auxiliares WAL/SHM)
+biblioteca.db
+*.db
+*.db-wal
+*.db-shm
+
+# Listas de URLs personales de la CLI (se versiona solo urls.example.txt)
+urls.txt
+
+# Cookies y logs (datos sensibles / locales)
+cookies.txt
+*.log
+
+# ───────────────────────────── Editores / SO ─────────────────────────────
+.vscode/
+.idea/
+.junie/
+.DS_Store
+Thumbs.db
+
+# ────────────────────────────── Claude Code ──────────────────────────────
+.claude/settings.local.json
