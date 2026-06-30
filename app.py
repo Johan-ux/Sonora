@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Interfaz web para el descargador de música personal.
 
-Aplicación Flask que proporciona una interfaz web moderna para descargar
-música desde YouTube usando yt-dlp. Incluye progreso en tiempo real
-mediante Server-Sent Events (SSE).
+Aplicación Flask con layout 70/30: navegador YouTube embebido a la izquierda,
+panel de control con cola de descarga a la derecha, y explorador de carpetas
+opcional. Progreso en tiempo real mediante Server-Sent Events (SSE).
 
 Uso:
     python app.py
@@ -13,6 +13,7 @@ Uso:
 from __future__ import annotations
 
 import json
+import os
 import queue
 import re
 import threading
@@ -45,147 +46,203 @@ CARPETA_DESCARGAS.mkdir(parents=True, exist_ok=True)
 
 BITRATE_POR_DEFECTO = "320"
 
-# Almacén de tareas en memoria (suficiente para uso personal).
+# Almacén en memoria.
 tareas: dict[str, TareaDescarga] = {}
+cola_global: list[ItemCola] = []
+historial_completados: list[dict] = []
 
 
 # --------------------------------------------------------------------------- #
-# Modelo de tarea
+# Modelos
 # --------------------------------------------------------------------------- #
 
 @dataclass
-class ItemDescarga:
-    """Estado de una URL individual dentro de una tarea."""
+class ItemCola:
+    """Un elemento en la cola de descarga."""
+    id: str
     url: str
-    estado: str = "pendiente"  # pendiente | descargando | completado | error
     titulo: str = ""
+    thumbnail: str = ""
+    duracion: str = ""
+    canal: str = ""
+    estado: str = "en_cola"  # en_cola | descargando | completado | error
     progreso: float = 0.0
     error: str = ""
+    carpeta_destino: str = ""
 
 
 @dataclass
 class TareaDescarga:
-    """Agrupa varias URLs en una sola tarea de descarga."""
+    """Tarea de descarga activa."""
     id: str
-    items: list[ItemDescarga] = field(default_factory=list)
-    estado: str = "pendiente"  # pendiente | en_progreso | completada
+    items: list[ItemCola] = field(default_factory=list)
+    estado: str = "pendiente"
     cola_eventos: queue.Queue = field(default_factory=queue.Queue)
 
 
 # --------------------------------------------------------------------------- #
-# Lógica de descarga (en hilo separado)
+# Cola de eventos global para SSE
 # --------------------------------------------------------------------------- #
 
-def _enviar_evento(tarea: TareaDescarga, tipo: str, datos: dict) -> None:
-    """Encola un evento SSE para el cliente."""
-    tarea.cola_eventos.put({"tipo": tipo, **datos})
+clientes_sse: list[queue.Queue] = []
+lock_clientes = threading.Lock()
 
 
-def _hook_progreso(d: dict, tarea: TareaDescarga, item: ItemDescarga) -> None:
-    """Hook de progreso de yt-dlp: actualiza el item y envía evento SSE."""
+def emitir_evento(tipo: str, datos: dict) -> None:
+    """Envía un evento a todos los clientes SSE conectados."""
+    evento = {"tipo": tipo, **datos}
+    with lock_clientes:
+        for q in clientes_sse:
+            try:
+                q.put_nowait(evento)
+            except queue.Full:
+                pass
+
+
+# --------------------------------------------------------------------------- #
+# Extracción de info de video
+# --------------------------------------------------------------------------- #
+
+def extraer_info_video(url: str) -> dict | None:
+    """Extrae metadatos de un video de YouTube sin descargarlo."""
+    ffmpeg_loc = localizar_ffmpeg()
+    opciones = {
+        "quiet": True,
+        "no_warnings": True,
+        "extract_flat": False,
+        "noplaylist": True,
+    }
+    if ffmpeg_loc:
+        opciones["ffmpeg_location"] = str(ffmpeg_loc)
+
+    try:
+        with yt_dlp.YoutubeDL(opciones) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if info is None:
+                return None
+            duracion_seg = info.get("duration", 0) or 0
+            minutos = int(duracion_seg) // 60
+            segundos = int(duracion_seg) % 60
+            return {
+                "url": url,
+                "titulo": info.get("title", "Sin título"),
+                "thumbnail": info.get("thumbnail", ""),
+                "duracion": f"{minutos}:{segundos:02d}",
+                "canal": info.get("uploader", info.get("channel", "")),
+                "id": info.get("id", ""),
+            }
+    except Exception:
+        return None
+
+
+# --------------------------------------------------------------------------- #
+# Descarga en hilo
+# --------------------------------------------------------------------------- #
+
+descarga_activa = threading.Event()
+lock_cola = threading.Lock()
+
+
+def _hook_progreso(d: dict, item: ItemCola) -> None:
+    """Hook de progreso de yt-dlp."""
     if d["status"] == "downloading":
         total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
         descargado = d.get("downloaded_bytes", 0)
         porcentaje = (descargado / total * 100) if total else 0
         item.progreso = round(porcentaje, 1)
-        item.titulo = d.get("info_dict", {}).get("title", item.titulo)
-        _enviar_evento(tarea, "progreso", {
-            "url": item.url,
-            "titulo": item.titulo,
+        item.titulo = d.get("info_dict", {}).get("title", item.titulo) or item.titulo
+        emitir_evento("progreso", {
+            "id": item.id,
             "progreso": item.progreso,
+            "titulo": item.titulo,
         })
     elif d["status"] == "finished":
-        item.titulo = d.get("info_dict", {}).get("title", item.titulo)
-        _enviar_evento(tarea, "progreso", {
-            "url": item.url,
-            "titulo": item.titulo,
+        item.titulo = d.get("info_dict", {}).get("title", item.titulo) or item.titulo
+        emitir_evento("progreso", {
+            "id": item.id,
             "progreso": 100.0,
             "mensaje": "Convirtiendo a MP3…",
         })
 
 
-def _ejecutar_descarga(tarea: TareaDescarga, bitrate: str) -> None:
-    """Descarga todas las URLs de la tarea (ejecutar en hilo)."""
-    tarea.estado = "en_progreso"
-    _enviar_evento(tarea, "inicio", {"total": len(tarea.items)})
-
+def procesar_cola() -> None:
+    """Procesa la cola de descarga secuencialmente."""
     ffmpeg_loc = localizar_ffmpeg()
 
-    for i, item in enumerate(tarea.items):
-        item.estado = "descargando"
-        _enviar_evento(tarea, "descargando", {
-            "url": item.url,
-            "indice": i + 1,
-            "total": len(tarea.items),
+    while True:
+        item_actual = None
+        with lock_cola:
+            for item in cola_global:
+                if item.estado == "en_cola":
+                    item_actual = item
+                    item.estado = "descargando"
+                    break
+
+        if item_actual is None:
+            descarga_activa.clear()
+            return
+
+        emitir_evento("descargando", {
+            "id": item_actual.id,
+            "titulo": item_actual.titulo,
         })
+
+        carpeta = Path(item_actual.carpeta_destino) if item_actual.carpeta_destino else CARPETA_DESCARGAS
+        carpeta.mkdir(parents=True, exist_ok=True)
 
         opciones: dict = {
             "format": "bestaudio/best",
-            "outtmpl": str(CARPETA_DESCARGAS / "%(title)s.%(ext)s"),
+            "outtmpl": str(carpeta / "%(title)s.%(ext)s"),
             "writethumbnail": True,
             "ignoreerrors": False,
             "noplaylist": True,
             "progress_hooks": [
-                lambda d, t=tarea, it=item: _hook_progreso(d, t, it)
+                lambda d, it=item_actual: _hook_progreso(d, it)
             ],
             "postprocessors": [
                 {
                     "key": "FFmpegExtractAudio",
                     "preferredcodec": "mp3",
-                    "preferredquality": bitrate,
+                    "preferredquality": BITRATE_POR_DEFECTO,
                 },
                 {"key": "FFmpegMetadata", "add_metadata": True},
                 {"key": "EmbedThumbnail", "already_have_thumbnail": False},
             ],
         }
 
-        if ffmpeg_loc is not None:
+        if ffmpeg_loc:
             opciones["ffmpeg_location"] = str(ffmpeg_loc)
 
         try:
             with yt_dlp.YoutubeDL(opciones) as ydl:
-                ydl.download([item.url])
-            item.estado = "completado"
-            item.progreso = 100.0
-            _enviar_evento(tarea, "completado", {
-                "url": item.url,
-                "titulo": item.titulo,
+                ydl.download([item_actual.url])
+            item_actual.estado = "completado"
+            item_actual.progreso = 100.0
+            historial_completados.insert(0, {
+                "id": item_actual.id,
+                "titulo": item_actual.titulo,
+                "url": item_actual.url,
+                "carpeta": str(carpeta),
             })
-        except (DownloadError, Exception) as error:  # noqa: BLE001
-            item.estado = "error"
-            item.error = str(error)
-            _enviar_evento(tarea, "error", {
-                "url": item.url,
+            emitir_evento("completado", {
+                "id": item_actual.id,
+                "titulo": item_actual.titulo,
+            })
+        except (DownloadError, Exception) as error:
+            item_actual.estado = "error"
+            item_actual.error = str(error)
+            emitir_evento("error", {
+                "id": item_actual.id,
                 "error": " ".join(str(error).split()),
             })
 
-    tarea.estado = "completada"
-    completados = sum(1 for it in tarea.items if it.estado == "completado")
-    _enviar_evento(tarea, "fin", {
-        "completados": completados,
-        "total": len(tarea.items),
-    })
-    # Señal de cierre del stream SSE.
-    tarea.cola_eventos.put(None)
 
-
-# --------------------------------------------------------------------------- #
-# Utilidades
-# --------------------------------------------------------------------------- #
-
-def _parsear_urls(texto: str) -> list[str]:
-    """Extrae URLs únicas de un texto (separadas por comas, espacios o saltos de línea)."""
-    urls: list[str] = []
-    vistas: set[str] = set()
-    for linea in texto.splitlines():
-        if linea.lstrip().startswith("#"):
-            continue
-        for fragmento in re.split(r"[,\s]+", linea):
-            url = fragmento.strip()
-            if url and url.startswith("http") and url not in vistas:
-                vistas.add(url)
-                urls.append(url)
-    return urls
+def iniciar_procesamiento_cola() -> None:
+    """Inicia el procesamiento de la cola si no está activo."""
+    if not descarga_activa.is_set():
+        descarga_activa.set()
+        hilo = threading.Thread(target=procesar_cola, daemon=True)
+        hilo.start()
 
 
 # --------------------------------------------------------------------------- #
@@ -198,73 +255,191 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/api/descargar", methods=["POST"])
-def api_descargar():
-    """Inicia una tarea de descarga con las URLs proporcionadas."""
+@app.route("/api/info", methods=["POST"])
+def api_info():
+    """Extrae información de un video de YouTube."""
     datos = request.get_json(silent=True) or {}
-    texto_urls = datos.get("urls", "")
-    bitrate = datos.get("bitrate", BITRATE_POR_DEFECTO)
+    url = datos.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "URL vacía"}), 400
 
-    urls = _parsear_urls(texto_urls)
-    if not urls:
-        return jsonify({"error": "No se encontraron URLs válidas."}), 400
+    info = extraer_info_video(url)
+    if info is None:
+        return jsonify({"error": "No se pudo obtener información del video"}), 400
 
-    tarea_id = uuid.uuid4().hex[:12]
-    tarea = TareaDescarga(
-        id=tarea_id,
-        items=[ItemDescarga(url=url) for url in urls],
+    return jsonify(info)
+
+
+@app.route("/api/cola/agregar", methods=["POST"])
+def api_cola_agregar():
+    """Agrega un item a la cola de descarga."""
+    datos = request.get_json(silent=True) or {}
+    url = datos.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "URL vacía"}), 400
+
+    item_id = uuid.uuid4().hex[:10]
+    item = ItemCola(
+        id=item_id,
+        url=url,
+        titulo=datos.get("titulo", ""),
+        thumbnail=datos.get("thumbnail", ""),
+        duracion=datos.get("duracion", ""),
+        canal=datos.get("canal", ""),
+        carpeta_destino=datos.get("carpeta", ""),
     )
-    tareas[tarea_id] = tarea
 
-    hilo = threading.Thread(
-        target=_ejecutar_descarga,
-        args=(tarea, bitrate),
-        daemon=True,
-    )
-    hilo.start()
+    with lock_cola:
+        cola_global.append(item)
 
-    return jsonify({"tarea_id": tarea_id, "urls": urls})
+    emitir_evento("cola_actualizada", _estado_cola())
+    return jsonify({"id": item_id, "mensaje": "Agregado a la cola"})
 
 
-@app.route("/api/progreso/<tarea_id>")
-def api_progreso(tarea_id: str):
-    """Stream SSE con el progreso de una tarea."""
-    tarea = tareas.get(tarea_id)
-    if tarea is None:
-        return jsonify({"error": "Tarea no encontrada."}), 404
+@app.route("/api/cola/eliminar", methods=["POST"])
+def api_cola_eliminar():
+    """Elimina un item de la cola (solo si está en_cola)."""
+    datos = request.get_json(silent=True) or {}
+    item_id = datos.get("id", "")
+
+    with lock_cola:
+        cola_global[:] = [
+            it for it in cola_global
+            if not (it.id == item_id and it.estado == "en_cola")
+        ]
+
+    emitir_evento("cola_actualizada", _estado_cola())
+    return jsonify({"ok": True})
+
+
+@app.route("/api/cola")
+def api_cola():
+    """Devuelve el estado actual de la cola."""
+    return jsonify(_estado_cola())
+
+
+@app.route("/api/cola/descargar", methods=["POST"])
+def api_cola_descargar():
+    """Inicia la descarga de la cola."""
+    iniciar_procesamiento_cola()
+    return jsonify({"ok": True, "mensaje": "Descarga iniciada"})
+
+
+@app.route("/api/eventos")
+def api_eventos():
+    """Stream SSE global de eventos."""
+    q: queue.Queue = queue.Queue(maxsize=200)
+    with lock_clientes:
+        clientes_sse.append(q)
 
     def generar():
-        while True:
-            try:
-                evento = tarea.cola_eventos.get(timeout=60)
-            except queue.Empty:
-                # Keep-alive para evitar timeout del navegador.
-                yield ":\n\n"
-                continue
-            if evento is None:
-                break
-            yield f"data: {json.dumps(evento, ensure_ascii=False)}\n\n"
+        try:
+            while True:
+                try:
+                    evento = q.get(timeout=30)
+                    yield f"data: {json.dumps(evento, ensure_ascii=False)}\n\n"
+                except queue.Empty:
+                    yield ":\n\n"
+        finally:
+            with lock_clientes:
+                if q in clientes_sse:
+                    clientes_sse.remove(q)
 
     return Response(generar(), mimetype="text/event-stream")
 
 
-@app.route("/api/archivos")
-def api_archivos():
-    """Lista los MP3 descargados."""
-    archivos = []
-    if CARPETA_DESCARGAS.exists():
-        for f in sorted(CARPETA_DESCARGAS.glob("*.mp3"), key=lambda p: p.stat().st_mtime, reverse=True):
-            archivos.append({
-                "nombre": f.name,
-                "tamaño": f.stat().st_size,
-            })
-    return jsonify(archivos)
+@app.route("/api/carpetas")
+def api_carpetas():
+    """Lista el contenido de una carpeta dentro de descargas."""
+    ruta_rel = request.args.get("ruta", "")
+    carpeta = (CARPETA_DESCARGAS / ruta_rel).resolve()
+
+    # Seguridad: no salir de CARPETA_DESCARGAS.
+    if not str(carpeta).startswith(str(CARPETA_DESCARGAS.resolve())):
+        return jsonify({"error": "Ruta no permitida"}), 403
+
+    if not carpeta.exists():
+        return jsonify({"error": "Carpeta no encontrada"}), 404
+
+    items = []
+    for entry in sorted(carpeta.iterdir(), key=lambda p: (p.is_file(), p.name.lower())):
+        if entry.name.startswith("."):
+            continue
+        items.append({
+            "nombre": entry.name,
+            "es_carpeta": entry.is_dir(),
+            "tamaño": entry.stat().st_size if entry.is_file() else 0,
+            "ruta": str(entry.relative_to(CARPETA_DESCARGAS.resolve())).replace("\\", "/"),
+        })
+
+    # Ruta relativa actual.
+    try:
+        ruta_actual = str(carpeta.relative_to(CARPETA_DESCARGAS.resolve())).replace("\\", "/")
+    except ValueError:
+        ruta_actual = ""
+    if ruta_actual == ".":
+        ruta_actual = ""
+
+    return jsonify({
+        "ruta": ruta_actual,
+        "items": items,
+        "puede_subir": ruta_actual != "",
+    })
+
+
+@app.route("/api/carpetas/crear", methods=["POST"])
+def api_carpetas_crear():
+    """Crea una nueva carpeta dentro de descargas."""
+    datos = request.get_json(silent=True) or {}
+    ruta_padre = datos.get("ruta_padre", "")
+    nombre = datos.get("nombre", "").strip()
+
+    if not nombre or "/" in nombre or "\\" in nombre:
+        return jsonify({"error": "Nombre de carpeta no válido"}), 400
+
+    carpeta = (CARPETA_DESCARGAS / ruta_padre / nombre).resolve()
+    if not str(carpeta).startswith(str(CARPETA_DESCARGAS.resolve())):
+        return jsonify({"error": "Ruta no permitida"}), 403
+
+    carpeta.mkdir(parents=True, exist_ok=True)
+    return jsonify({"ok": True, "ruta": str(carpeta.relative_to(CARPETA_DESCARGAS.resolve())).replace("\\", "/")})
+
+
+@app.route("/api/historial")
+def api_historial():
+    """Devuelve el historial de descargas completadas."""
+    return jsonify(historial_completados[:50])
 
 
 @app.route("/descargas/<path:nombre>")
 def servir_archivo(nombre: str):
-    """Sirve un archivo MP3 descargado."""
+    """Sirve un archivo descargado."""
     return send_from_directory(CARPETA_DESCARGAS, nombre, as_attachment=True)
+
+
+# --------------------------------------------------------------------------- #
+# Utilidades internas
+# --------------------------------------------------------------------------- #
+
+def _estado_cola() -> dict:
+    """Devuelve el estado serializable de la cola."""
+    return {
+        "items": [
+            {
+                "id": it.id,
+                "url": it.url,
+                "titulo": it.titulo,
+                "thumbnail": it.thumbnail,
+                "duracion": it.duracion,
+                "canal": it.canal,
+                "estado": it.estado,
+                "progreso": it.progreso,
+                "error": it.error,
+                "carpeta": it.carpeta_destino,
+            }
+            for it in cola_global
+        ]
+    }
 
 
 # --------------------------------------------------------------------------- #
