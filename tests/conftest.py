@@ -98,6 +98,7 @@ def app(entorno):
     global ``_INICIALIZADO`` ni tocar las rutas reales del repositorio.
     """
     from sonora.api import registrar_blueprints
+    from sonora.factory import _bloquear_peticiones_externas
     from sonora.paths import RUTA_RECURSOS
 
     aplicacion = Flask(
@@ -106,6 +107,9 @@ def app(entorno):
         static_folder=str(RUTA_RECURSOS / "static"),
     )
     aplicacion.config["TESTING"] = True
+    # El mismo guard que instala crear_app(): sin él, los tests correrían
+    # contra una app distinta de la real y no verían un fallo de origen.
+    aplicacion.before_request(_bloquear_peticiones_externas)
     registrar_blueprints(aplicacion)
     return aplicacion
 

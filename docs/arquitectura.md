@@ -11,7 +11,7 @@ sonora/                    Paquete principal (app de escritorio + CLI)
 ├── __main__.py            Punto de entrada: python -m sonora (y del .exe)
 ├── escritorio.py          Servidor Flask en hilo daemon + ventana pywebview
 ├── cli.py                 CLI de descarga por lotes (python -m sonora.cli)
-├── factory.py             crear_app() + preparar() (ensamblaje de la app)
+├── factory.py             crear_app() + preparar() y el guard de Origin
 ├── paths.py               Rutas de datos/recursos y validación anti path-traversal
 ├── ffmpeg.py              Localización de ffmpeg (compartida con la CLI)
 ├── ydl_opts.py            Opciones de yt-dlp compartidas (app + CLI)
