@@ -1,0 +1,7 @@
+# Ejemplo de fichero de URLs para la CLI (python -m sonora.cli).
+# Copia este fichero a 'urls.txt' y pon tus enlaces.
+# - Una URL por línea, o varias separadas por comas.
+# - Las líneas que empiezan por '#' se ignoran (comentarios).
+
+https://www.youtube.com/watch?v=FGBhQbmPwH8
+# https://youtu.be/otro_id, https://youtu.be/otro_mas

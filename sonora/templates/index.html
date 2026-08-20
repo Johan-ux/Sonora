@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sonora</title>
+    <link rel="icon" type="image/svg+xml"
+          href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="%23151210"/><path d="M8 20V12M13 23V9M18 20v-8M23 17v-3" stroke="%23FFB454" stroke-width="3" stroke-linecap="round"/></svg>'>
+    <link rel="stylesheet" href="/static/css/estilo.css">
+</head>
+<body>
+    <a class="salto-contenido" href="#contenido">Saltar al contenido</a>
+
+    <div class="app">
+
+        <!-- ===============================================================
+             Barra lateral: marca + navegación + estado de ffmpeg
+             =============================================================== -->
+        <aside class="sidebar">
+            <p class="marca">
+                <svg class="marca-icono" aria-hidden="true" viewBox="0 0 32 32" width="28" height="28">
+                    <rect width="32" height="32" rx="7" fill="var(--fondo-2)"/>
+                    <path d="M8 20V12M13 23V9M18 20v-8M23 17v-3" stroke="var(--ambar)" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+                <span class="marca-nombre">SONORA</span>
+            </p>
+
+            <nav class="sidebar-nav" aria-label="Principal">
+                <ul role="list">
+                    <li>
+                        <button type="button" class="nav-item" data-vista="buscar" aria-current="page">
+                            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span>Buscar</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="nav-item" data-vista="cola">
+                            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span>Descargas</span>
+                            <span class="nav-badge" id="badge-cola" hidden></span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="nav-item" data-vista="biblioteca">
+                            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="16.5" cy="16" r="2.5" fill="currentColor"/></svg>
+                            <span>Biblioteca</span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="nav-item" data-vista="historial">
+                            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            <span>Historial</span>
+                        </button>
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar-pie">
+                <p class="aviso-ffmpeg" id="aviso-ffmpeg" hidden>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16"><path d="M12 3 2 21h20L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="18" r="1.2" fill="currentColor"/></svg>
+                    Falta ffmpeg: la conversión a MP3 fallará. Instálalo con
+                    <code>winget install Gyan.FFmpeg</code>.
+                </p>
+            </div>
+        </aside>
+
+        <!-- ===============================================================
+             Zona principal: buscador global arriba + vistas
+             =============================================================== -->
+        <div class="principal">
+            <header class="topbar">
+                <search class="buscador">
+                    <form id="form-buscar" role="none">
+                        <svg class="buscador-icono" aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        <label class="visualmente-oculto" for="campo-buscar">Buscar en YouTube o pegar una URL</label>
+                        <input id="campo-buscar" type="search" autocomplete="off" spellcheck="false"
+                               placeholder="Busca una canción o pega una URL de vídeo, playlist o canal…">
+                        <button type="submit" class="btn btn-ambar">Buscar</button>
+                    </form>
+                </search>
+            </header>
+
+            <main id="contenido" tabindex="-1">
+
+                <!-- ─────────────── Vista: Buscar ─────────────── -->
+                <section id="vista-buscar" class="vista">
+                    <h1 class="visualmente-oculto">Buscar música</h1>
+                    <div id="resultados">
+                        <div class="estado-vacio">
+                            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <h2>Encuentra tu próxima canción</h2>
+                            <p>Busca por título o artista, o pega una URL de YouTube: un vídeo,
+                               una playlist entera o un canal.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ─────────────── Vista: Descargas (cola) ─────────────── -->
+                <section id="vista-cola" class="vista" hidden>
+                    <div class="vista-cabecera">
+                        <h1>Descargas</h1>
+                        <div class="cola-ajustes">
+                            <button type="button" class="btn btn-fantasma" id="btn-carpeta">
+                                <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+                                <span>Guardar en: <strong id="carpeta-actual">descargas/</strong></span>
+                            </button>
+                            <div class="segmentado" role="group" aria-label="Formato de descarga">
+                                <button type="button" class="seg-btn" id="seg-audio" data-formato="audio" aria-pressed="true">
+                                    <svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15"><path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="16.5" cy="16" r="2.5" fill="currentColor"/></svg>
+                                    Audio
+                                </button>
+                                <button type="button" class="seg-btn" id="seg-video" data-formato="video" aria-pressed="false">
+                                    <svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15"><rect x="3" y="6" width="13" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 10 5-3v10l-5-3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+                                    Vídeo
+                                </button>
+                            </div>
+                            <label class="ajuste-calidad" id="ajuste-bitrate">
+                                <span>Calidad</span>
+                                <select id="select-bitrate">
+                                    <option value="128">128 kbps</option>
+                                    <option value="192">192 kbps</option>
+                                    <option value="256">256 kbps</option>
+                                    <option value="320" selected>320 kbps</option>
+                                </select>
+                            </label>
+                            <label class="ajuste-calidad" id="ajuste-resolucion" hidden>
+                                <span>Resolución</span>
+                                <select id="select-resolucion">
+                                    <option value="best">La mejor</option>
+                                    <option value="2160">2160p (4K)</option>
+                                    <option value="1440">1440p</option>
+                                    <option value="1080" selected>1080p</option>
+                                    <option value="720">720p</option>
+                                    <option value="480">480p</option>
+                                    <option value="360">360p</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="cola-acciones" id="cola-acciones" hidden>
+                        <button type="button" class="btn btn-ambar" id="btn-descargar">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span id="btn-descargar-texto">Descargar todo</span>
+                        </button>
+                        <button type="button" class="btn btn-fantasma" id="btn-reintentar-todos" hidden>Reintentar fallidos</button>
+                        <button type="button" class="btn btn-fantasma" id="btn-limpiar" hidden>Limpiar terminados</button>
+                        <p class="cola-resumen" id="cola-resumen"></p>
+                    </div>
+
+                    <div id="cola-lista"></div>
+                </section>
+
+                <!-- ─────────────── Vista: Biblioteca ─────────────── -->
+                <section id="vista-biblioteca" class="vista" hidden>
+                    <div class="vista-cabecera">
+                        <h1>Biblioteca</h1>
+                        <div class="biblioteca-filtro">
+                            <label class="visualmente-oculto" for="filtro-biblioteca">Filtrar la biblioteca</label>
+                            <input id="filtro-biblioteca" type="search" autocomplete="off"
+                                   placeholder="Filtrar por título, artista o archivo…">
+                        </div>
+                    </div>
+                    <div class="carpetas-chips" id="carpetas-biblioteca"></div>
+                    <div id="biblioteca-lista"></div>
+                </section>
+
+                <!-- ─────────────── Vista: Historial ─────────────── -->
+                <section id="vista-historial" class="vista" hidden>
+                    <div class="vista-cabecera">
+                        <h1>Historial</h1>
+                        <button type="button" class="btn btn-fantasma" id="btn-limpiar-historial" hidden>
+                            Limpiar historial
+                        </button>
+                    </div>
+                    <div id="historial-lista"></div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- ===============================================================
+         Barra de reproducción (fija abajo)
+         =============================================================== -->
+    <footer class="reproductor" id="reproductor">
+        <div class="rep-pista">
+            <div class="rep-cover" id="rep-cover" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="16.5" cy="16" r="2.5" fill="currentColor"/></svg>
+            </div>
+            <div class="rep-meta">
+                <p class="rep-titulo" id="rep-titulo">Nada en reproducción</p>
+                <p class="rep-artista" id="rep-artista">Elige una pista en la biblioteca</p>
+            </div>
+            <div class="eq" id="eq" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        </div>
+
+        <div class="rep-centro">
+            <div class="rep-botones">
+                <button type="button" class="btn-icono" id="btn-aleatorio" aria-label="Aleatorio" aria-pressed="false" title="Aleatorio">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 7h3.5c1.5 0 2.5.6 3.4 1.8l4.2 6.4c.9 1.2 1.9 1.8 3.4 1.8H21m0 0-2.5-2.5M21 17l-2.5 2.5M3 17h3.5c.8 0 1.5-.2 2.1-.6M21 7h-3.5c-.8 0-1.5.2-2.1.6M21 7l-2.5-2.5M21 7l-2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button type="button" class="btn-icono" id="btn-anterior" aria-label="Anterior">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 5v14M19 5l-9 7 9 7V5z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                </button>
+                <button type="button" class="btn-icono btn-play" id="btn-play" aria-label="Reproducir">
+                    <svg aria-hidden="true" viewBox="0 0 24 24" class="icono-play"><path d="M8 5.5v13l11-6.5-11-6.5z" fill="currentColor"/></svg>
+                    <svg aria-hidden="true" viewBox="0 0 24 24" class="icono-pausa" hidden><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg>
+                </button>
+                <button type="button" class="btn-icono" id="btn-siguiente" aria-label="Siguiente">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 5v14M5 5l9 7-9 7V5z" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                </button>
+                <button type="button" class="btn-icono" id="btn-repetir" aria-label="Repetir" aria-pressed="false" title="Repetir">
+                    <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M17 3.5 20 6.5l-3 3M20 6.5H8a4 4 0 0 0-4 4V12M7 20.5l-3-3 3-3M4 17.5h12a4 4 0 0 0 4-4V12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span class="repetir-uno" aria-hidden="true" hidden>1</span>
+                </button>
+            </div>
+            <div class="rep-progreso">
+                <span class="rep-tiempo" id="tiempo-actual">0:00</span>
+                <input type="range" id="seek" min="0" max="100" step="0.1" value="0"
+                       aria-label="Posición de la pista" disabled>
+                <span class="rep-tiempo" id="tiempo-total">0:00</span>
+            </div>
+        </div>
+
+        <div class="rep-extras">
+            <button type="button" class="btn-icono" id="btn-mostrar-video" aria-label="Mostrar el vídeo" title="Mostrar el vídeo" hidden>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="m16 10 5-3v10l-5-3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="btn-icono" id="btn-abrir-carpeta" aria-label="Mostrar el archivo en su carpeta" title="Mostrar en la carpeta" hidden>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            </button>
+            <svg class="volumen-icono" aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <input type="range" id="volumen" min="0" max="1" step="0.01" value="1" aria-label="Volumen">
+        </div>
+    </footer>
+
+    <!-- ===============================================================
+         Escenario de vídeo (mini-teatro flotante). El <video> es el ÚNICO
+         elemento multimedia: reproduce también el audio (MP3), pero entonces
+         el escenario permanece oculto. Vive fijo aquí para no re-parentar un
+         medio en reproducción (evita recargas/parpadeos).
+         =============================================================== -->
+    <section class="escenario-video" id="escenario-video" aria-label="Reproductor de vídeo" hidden>
+        <div class="ev-barra">
+            <p class="ev-titulo" id="ev-titulo"></p>
+            <button type="button" class="btn-icono" id="btn-video-pantalla" aria-label="Pantalla completa" title="Pantalla completa">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button type="button" class="btn-icono" id="btn-video-ocultar" aria-label="Ocultar el vídeo (seguir escuchando)" title="Ocultar el vídeo">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+        </div>
+        <div class="ev-marco" id="ev-marco">
+            <video id="media" preload="metadata" playsinline></video>
+        </div>
+    </section>
+
+    <!-- ===============================================================
+         Diálogo modal: explorador de carpetas de destino
+         =============================================================== -->
+    <dialog id="dialogo-carpetas" aria-labelledby="dlg-titulo">
+        <h2 id="dlg-titulo">Elegir carpeta de destino</h2>
+        <p class="dlg-ruta">
+            <button type="button" class="btn-icono" id="btn-dlg-subir" aria-label="Subir a la carpeta superior" hidden>
+                <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16"><path d="M12 19V5m0 0-6 6m6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span id="dlg-ruta">descargas/</span>
+        </p>
+        <ul class="dlg-lista" id="dlg-lista" role="list"></ul>
+        <div class="dlg-nueva">
+            <label class="visualmente-oculto" for="dlg-nueva-nombre">Nombre de la carpeta nueva</label>
+            <input id="dlg-nueva-nombre" type="text" autocomplete="off" placeholder="Nueva carpeta…">
+            <button type="button" class="btn btn-fantasma" id="btn-dlg-crear">Crear</button>
+        </div>
+        <form method="dialog" class="dlg-pie">
+            <button type="submit" class="btn btn-fantasma" value="cancelar">Cancelar</button>
+            <button type="button" class="btn btn-ambar" id="btn-dlg-seleccionar">Guardar aquí</button>
+        </form>
+    </dialog>
+
+    <!-- ===============================================================
+         Diálogo de confirmación propio (sustituye a window.confirm, que en
+         una app de escritorio muestra el "127.0.0.1 dice…" del navegador).
+         =============================================================== -->
+    <dialog id="dialogo-confirmar" class="dialogo-confirmar" aria-labelledby="conf-titulo">
+        <h2 id="conf-titulo"></h2>
+        <p id="conf-mensaje" class="conf-mensaje"></p>
+        <form method="dialog" class="dlg-pie">
+            <button type="submit" class="btn btn-fantasma" value="cancelar">Cancelar</button>
+            <button type="submit" class="btn btn-peligro" value="ok" id="conf-ok">Eliminar</button>
+        </form>
+    </dialog>
+
+    <!-- Avisos (toasts): región viva única, cortés -->
+    <div id="avisos" class="avisos" role="status" aria-live="polite"></div>
+
+    <script src="/static/js/app.js" defer></script>
+</body>
+</html>

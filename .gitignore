@@ -14,9 +14,11 @@ env/
 # ─────────────────────── Empaquetado (PyInstaller) ───────────────────────
 build/
 dist/
-# Nota: mi_musica.spec SÍ se versiona (NO se ignora).
+# Nota: scripts/sonora.spec SÍ se versiona (NO se ignora).
 
 # ───────────────────────── Datos locales / generados ─────────────────────
+# Carpeta de datos en desarrollo (descargas + base de datos): nunca se versiona.
+datos/
 descargas/
 *.mp3
 

@@ -1,0 +1,14 @@
+# Configuración de herramientas del proyecto Sonora.
+#
+# No hay secciones [project] ni [build-system] a propósito: Sonora es una app de
+# escritorio de uso personal, no un paquete que se publique ni se instale con
+# pip. Las dependencias viven en requirements.txt / requirements-dev.txt, que es
+# lo que usan la CI y el empaquetado con PyInstaller.
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-q"
+# La raíz del repositorio en sys.path para que los tests importen 'sonora'
+# sin instalar el paquete.
+pythonpath = ["."]
