@@ -131,6 +131,7 @@ const estado = {
   bitrate: "320",
   formato: "audio",             // formato por defecto: 'audio' | 'video'
   resolucion: "1080",           // resolución por defecto para vídeo
+  simultaneas: 3,               // descargas en paralelo
   ffmpegDisponible: true,
   salud: null,                  // último chequeo del entorno (/api/salud)
   cola: [],                     // ítems de la cola (espejo de la BD, vía SSE)
@@ -211,9 +212,11 @@ async function cargarConfig() {
     estado.bitrate = cfg.bitrate_por_defecto || "320";
     estado.formato = cfg.formato_por_defecto || "audio";
     estado.resolucion = cfg.resolucion_por_defecto || "1080";
+    estado.simultaneas = cfg.descargas_simultaneas || 3;
     estado.ffmpegDisponible = Boolean(cfg.ffmpeg_disponible);
     $("#select-bitrate").value = estado.bitrate;
     $("#select-resolucion").value = estado.resolucion;
+    $("#select-simultaneas").value = String(estado.simultaneas);
     $("#carpeta-actual").textContent = etiquetaCarpeta(estado.carpetaDestino);
     $("#aviso-ffmpeg").hidden = estado.ffmpegDisponible;
     reflejarFormato();
@@ -251,6 +254,11 @@ function iniciarConfig() {
   $("#select-resolucion").addEventListener("change", (e) => {
     estado.resolucion = e.target.value;
     guardarConfig({ resolucion_por_defecto: estado.resolucion });
+  });
+  $("#select-simultaneas").addEventListener("change", (e) => {
+    estado.simultaneas = Number(e.target.value) || 3;
+    // Se aplica a la siguiente tanda: los workers ya en marcha terminan lo suyo.
+    guardarConfig({ descargas_simultaneas: estado.simultaneas });
   });
   $("#seg-audio").addEventListener("click", () => cambiarFormato("audio"));
   $("#seg-video").addEventListener("click", () => cambiarFormato("video"));
@@ -313,9 +321,17 @@ function tarjetaResultado(r) {
     'data-url="' + esc(r.url) + '" data-titulo="' + esc(r.titulo) + '" ' +
     'data-thumbnail="' + esc(r.thumbnail) + '" data-duracion="' + esc(r.duracion) + '" ' +
     'data-canal="' + esc(r.canal) + '"';
+  // El botón de escucha va antes del grupo ＋/▾ en el DOM: cubre la portada
+  // entera y el CSS lo deja por debajo de ellos.
+  const preview = r.id
+    ? '<button type="button" class="tarjeta-preview" data-preview-id="' + esc(r.id) + '" ' +
+        datosItem + ' aria-label="Escuchar antes de descargar: ' + esc(r.titulo) + '">' +
+        '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.45)"/>' +
+        '<path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor"/></svg></button>'
+    : "";
   return (
     '<article class="tarjeta">' +
-      '<div class="tarjeta-cover">' + conThumb + duracion +
+      '<div class="tarjeta-cover">' + conThumb + duracion + preview +
         '<div class="tarjeta-add-grupo">' +
           '<button type="button" class="tarjeta-add" ' + datosItem + ' ' +
             'aria-label="Añadir a la cola: ' + esc(r.titulo) + '">＋</button>' +
@@ -396,6 +412,9 @@ function renderResultados(datos) {
   // Listeners de la vista recién pintada.
   $$("#resultados .tarjeta-add").forEach((btn) => {
     btn.addEventListener("click", () => agregarUno(btn));
+  });
+  $$("#resultados .tarjeta-preview").forEach((btn) => {
+    btn.addEventListener("click", () => abrirPreview(btn));
   });
   $$("#resultados .tarjeta-add-mas").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -1608,6 +1627,73 @@ function iniciarDialogoCarpetas() {
 }
 
 // ---------------------------------------------------------------------------
+// Vista previa: escuchar (o ver) antes de decidir la descarga
+//
+// Se usa el reproductor incrustado de YouTube en lugar de traer el audio por
+// nuestra cuenta: las URLs de stream van firmadas y caducan, así que un
+// <audio> apuntando a ellas se rompería solo. El dominio -nocookie evita que
+// YouTube plante cookies de seguimiento por el hecho de abrir la ventana.
+// ---------------------------------------------------------------------------
+
+// Campos que la tarjeta lleva en sus data-* y que necesita agregarUno().
+const CAMPOS_ITEM = ["url", "titulo", "thumbnail", "duracion", "canal"];
+
+function abrirPreview(btn) {
+  const id = btn.dataset.previewId;
+  if (!id) return;
+
+  $("#preview-titulo").textContent = btn.dataset.titulo || "Vista previa";
+  $("#preview-canal").textContent = btn.dataset.canal || "";
+
+  const iframe = document.createElement("iframe");
+  iframe.src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(id) +
+    "?autoplay=1&rel=0";
+  iframe.title = "Reproductor de " + (btn.dataset.titulo || "YouTube");
+  iframe.allow = "autoplay; encrypted-media; picture-in-picture";
+  iframe.allowFullscreen = true;
+  const marco = $("#preview-marco");
+  marco.innerHTML = "";
+  marco.appendChild(iframe);
+
+  // El botón del diálogo se prepara como si fuera el ＋ de la tarjeta, así
+  // añadir desde aquí pasa por el mismo agregarUno() y hereda su manejo de
+  // duplicados, formato y avisos.
+  const btnAnadir = $("#btn-preview-descargar");
+  for (const campo of CAMPOS_ITEM) btnAnadir.dataset[campo] = btn.dataset[campo] || "";
+  const yaEsta = estado.urlsActivas.has(btn.dataset.url);
+  btnAnadir.disabled = yaEsta;
+  btnAnadir.textContent = yaEsta ? "✓ Ya está en la cola" : "＋ Añadir a la cola";
+
+  $("#dialogo-preview").showModal();
+}
+
+function cerrarPreview() {
+  const dlg = $("#dialogo-preview");
+  if (dlg.open) dlg.close();  // el resto lo hace el manejador de 'close'
+}
+
+function iniciarPreview() {
+  const dlg = $("#dialogo-preview");
+  $("#btn-preview-cerrar").addEventListener("click", cerrarPreview);
+  // 'close' cubre todas las vías de cierre, incluido el Escape que el propio
+  // <dialog> gestiona: vaciar el marco destruye el iframe y corta el sonido.
+  dlg.addEventListener("close", () => {
+    $("#preview-marco").innerHTML = "";
+  });
+  // Clic en el fondo: el backdrop pertenece al <dialog>, de modo que el
+  // objetivo del evento es el diálogo mismo y no su contenido.
+  dlg.addEventListener("click", (e) => {
+    if (e.target === dlg) cerrarPreview();
+  });
+  $("#btn-preview-descargar").addEventListener("click", async (e) => {
+    const boton = e.currentTarget;
+    if (!boton.dataset.url) return;
+    await agregarUno(boton);
+    cerrarPreview();
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Chequeo del entorno (versión de yt-dlp, ffmpeg y runtime de JavaScript)
 //
 // Se lanza al abrir la app. Un yt-dlp viejo es la causa habitual de que las
@@ -1720,6 +1806,7 @@ document.addEventListener("DOMContentLoaded", () => {
   iniciarHistorial();
   iniciarReproductor();
   iniciarDialogoCarpetas();
+  iniciarPreview();
   iniciarSalud();
   cargarConfig();
   comprobarSalud();

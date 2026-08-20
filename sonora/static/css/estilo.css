@@ -327,6 +327,95 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     font-size: 0.8125rem;
 }
 
+/* ---------------------- Vista previa (reproductor) ----------------------- */
+
+/* Botón de escucha superpuesto en la portada del resultado. Aparece al pasar
+   por encima, pero se mantiene visible al enfocarlo con el teclado. */
+.tarjeta-preview {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: rgba(10, 8, 6, 0.45);
+    color: var(--texto);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--transicion);
+}
+
+.tarjeta:hover .tarjeta-preview,
+.tarjeta-preview:focus-visible { opacity: 1; }
+
+.tarjeta-preview svg {
+    width: 44px;
+    height: 44px;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+}
+
+.dialogo-preview {
+    width: min(880px, 92vw);
+    padding: 0;
+    border: 1px solid var(--linea);
+    border-radius: var(--radio);
+    background: var(--fondo-1);
+    color: var(--texto);
+    overflow: hidden;
+}
+
+.dialogo-preview::backdrop { background: rgba(0, 0, 0, 0.72); }
+
+.preview-cabecera {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+}
+
+.preview-cabecera h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    /* Un título largo no debe empujar al botón de cerrar fuera del diálogo. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 16:9 reservado de antemano: sin esto el diálogo da un salto al insertarse
+   el iframe. */
+.preview-marco {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    background: #000;
+}
+
+.preview-marco iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+
+.preview-pie {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+}
+
+.preview-canal {
+    margin: 0;
+    color: var(--texto-suave);
+    font-size: 0.875rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* ------------------------------ Topbar ---------------------------------- */
 
 .topbar {
@@ -617,6 +706,8 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     position: absolute;
     right: 8px;
     top: 8px;
+    /* Por encima de .tarjeta-preview, que ocupa la portada entera. */
+    z-index: 1;
     display: flex;
     gap: 3px;
     opacity: 0;

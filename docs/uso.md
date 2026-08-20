@@ -30,6 +30,38 @@ por completo.
   teclas multimedia del sistema.
 - **Historial**: consulta lo descargado anteriormente.
 
+## Escuchar antes de descargar
+
+Cada resultado de búsqueda tiene un botón de reproducción sobre su miniatura:
+abre una ventana con el reproductor de YouTube para decidir si la canción es la
+que buscabas antes de gastar la descarga. Desde ahí se añade a la cola
+directamente.
+
+Se usa el reproductor incrustado de YouTube (dominio `youtube-nocookie.com`,
+que no planta cookies de seguimiento) en lugar de traer el audio por nuestra
+cuenta: las URLs de stream van firmadas y caducan, así que un reproductor
+propio se rompería solo. Requiere conexión, y los vídeos cuyo autor prohíbe
+incrustarlos mostrarán en su lugar un aviso de YouTube.
+
+## Descargas en paralelo
+
+Por defecto se descargan **tres canciones a la vez**; se ajusta en
+**Descargas → A la vez** (de 1 a 5). Con una playlist grande la diferencia es
+notable, porque mientras una pista se convierte a MP3 las otras siguen
+bajando. Subirlo mucho no siempre es mejor: YouTube estrangula la conexión
+cuando se le piden demasiadas cosas a la vez.
+
+El cambio se aplica a la siguiente tanda; las descargas ya en marcha terminan
+lo suyo.
+
+## Reintentos automáticos
+
+Si una descarga falla por algo pasajero —un corte de red, un error del
+servidor— se reintenta sola hasta tres veces, esperando un poco más en cada
+intento. Los fallos definitivos (vídeo privado, borrado o bloqueado en tu
+país) no se reintentan: se marcan como error directamente, para no hacer
+esperar al resto de la cola.
+
 ## Aviso de actualización
 
 Al abrir Sonora se comprueba el entorno y, si algo merece tu atención, aparece

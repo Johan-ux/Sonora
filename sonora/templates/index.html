@@ -144,6 +144,16 @@
                                     <option value="360">360p</option>
                                 </select>
                             </label>
+                            <label class="ajuste-calidad" id="ajuste-simultaneas">
+                                <span>A la vez</span>
+                                <select id="select-simultaneas">
+                                    <option value="1">1 descarga</option>
+                                    <option value="2">2 descargas</option>
+                                    <option value="3" selected>3 descargas</option>
+                                    <option value="4">4 descargas</option>
+                                    <option value="5">5 descargas</option>
+                                </select>
+                            </label>
                         </div>
                     </div>
 
@@ -268,6 +278,23 @@
     <!-- ===============================================================
          Diálogo modal: explorador de carpetas de destino
          =============================================================== -->
+    <!-- Escucha antes de descargar: el reproductor incrustado de YouTube.
+         El iframe se crea al abrir y se destruye al cerrar; si se dejara en el
+         DOM, el vídeo seguiría sonando con el diálogo cerrado. -->
+    <dialog id="dialogo-preview" class="dialogo-preview" aria-labelledby="preview-titulo">
+        <header class="preview-cabecera">
+            <h2 id="preview-titulo">Vista previa</h2>
+            <button type="button" class="btn-icono" id="btn-preview-cerrar" aria-label="Cerrar la vista previa">
+                <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+        <div class="preview-marco" id="preview-marco"></div>
+        <footer class="preview-pie">
+            <p class="preview-canal" id="preview-canal"></p>
+            <button type="button" class="btn btn-ambar" id="btn-preview-descargar">＋ Añadir a la cola</button>
+        </footer>
+    </dialog>
+
     <dialog id="dialogo-carpetas" aria-labelledby="dlg-titulo">
         <h2 id="dlg-titulo">Elegir carpeta de destino</h2>
         <p class="dlg-ruta">
