@@ -47,6 +47,34 @@ class TestOrigenPermitido:
     def test_origen_ajeno_se_rechaza(self, origen):
         assert _origen_permitido(origen, "127.0.0.1:5099") is False
 
+    @pytest.mark.parametrize(
+        "origen",
+        [
+            # Regresión: comparar el puerto por contención de texto ("1" está
+            # dentro de "127.0.0.1:5099") dejaba pasar a cualquier servidor
+            # local cuyo puerto fuese subcadena del host.
+            "http://localhost:1",
+            "http://localhost:5",
+            "http://localhost:7",
+            "http://127.0.0.1:9",
+            "http://127.0.0.1:50",
+            "http://localhost:99",
+            "http://localhost:509",
+        ],
+    )
+    def test_otro_puerto_local_se_rechaza(self, origen):
+        assert _origen_permitido(origen, "127.0.0.1:5099") is False
+
+    @pytest.mark.parametrize(
+        "origen", ["http://localhost:abc", "http://localhost:-1", "http://localhost:99999"]
+    )
+    def test_puerto_invalido_no_revienta(self, origen):
+        # .port lanza ValueError con un puerto que no es un número válido.
+        assert _origen_permitido(origen, "127.0.0.1:5099") is False
+
+    def test_loopback_ipv6_con_el_puerto_correcto(self):
+        assert _origen_permitido("http://[::1]:5099", "127.0.0.1:5099") is True
+
 
 class TestGuardDeOrigen:
     @pytest.mark.parametrize("ruta", RUTAS_SENSIBLES)

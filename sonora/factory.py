@@ -52,14 +52,21 @@ def _origen_permitido(origen: str, host: str) -> bool:
     """
     try:
         partes = urlsplit(origen)
+        anfitrion = urlsplit("//" + host)
+        # .port parsea de forma perezosa y lanza si el puerto no es un número.
+        puerto_origen, puerto_host = partes.port, anfitrion.port
     except ValueError:
         return False
     if partes.scheme not in ("http", "https"):
         return False
     if partes.netloc == host:
         return True
-    puerto = partes.port
-    return partes.hostname in ("127.0.0.1", "localhost", "::1") and str(puerto) in host
+    if partes.hostname not in ("127.0.0.1", "localhost", "::1"):
+        return False
+    # Los puertos se comparan como números. Buscar el puerto DENTRO del host
+    # como texto aceptaría cualquier número que fuese subcadena suya: contra
+    # '127.0.0.1:5099' colarían los puertos 1, 5, 7, 9, 50, 99 o 509.
+    return puerto_origen == puerto_host
 
 
 def _bloquear_peticiones_externas():
