@@ -132,6 +132,7 @@ const estado = {
   formato: "audio",             // formato por defecto: 'audio' | 'video'
   resolucion: "1080",           // resolución por defecto para vídeo
   ffmpegDisponible: true,
+  salud: null,                  // último chequeo del entorno (/api/salud)
   cola: [],                     // ítems de la cola (espejo de la BD, vía SSE)
   urlsActivas: new Set(),       // urls 'en_cola' | 'descargando'
   lotesCerrados: new Set(),     // lotes plegados por el usuario (persistencia UI)
@@ -1607,6 +1608,106 @@ function iniciarDialogoCarpetas() {
 }
 
 // ---------------------------------------------------------------------------
+// Chequeo del entorno (versión de yt-dlp, ffmpeg y runtime de JavaScript)
+//
+// Se lanza al abrir la app. Un yt-dlp viejo es la causa habitual de que las
+// descargas empiecen a fallar con "HTTP Error 403", así que conviene enterarse
+// antes de intentar descargar, no después.
+// ---------------------------------------------------------------------------
+
+// Construye el aviso a partir del estado; devuelve null si no hay nada que
+// decir. Solo se informa de UNA cosa: la más urgente, para no llenar la barra
+// lateral de avisos compitiendo entre sí.
+function mensajeSalud(datos) {
+  const YTDLP = '<span class="paquete">yt-dlp</span>';
+  const yt = datos.yt_dlp || {};
+  const runtime = datos.runtime_js || {};
+
+  if (!yt.instalada) {
+    return { nivel: "error", html: "No se encontró " + YTDLP + ": las descargas no funcionarán.", accion: false };
+  }
+  if (yt.hay_actualizacion) {
+    const texto = "Hay una versión nueva de " + YTDLP + " (" + esc(yt.instalada) +
+      " → " + esc(yt.ultima) + "). Actualiza para evitar fallos de descarga.";
+    // Empaquetada: yt-dlp va dentro del .exe y pip no puede tocarlo.
+    if (!yt.actualizable) {
+      return { nivel: "aviso", html: texto + " Al ir empaquetada, hay que reconstruir la app.", accion: false };
+    }
+    return { nivel: "aviso", html: texto, accion: true };
+  }
+  if (yt.caducada) {
+    return {
+      nivel: "aviso",
+      html: "Tu " + YTDLP + " tiene " + esc(String(yt.dias)) + " días. No se pudo comprobar" +
+        " si hay una versión nueva; si las descargas fallan, actualiza.",
+      accion: Boolean(yt.actualizable),
+    };
+  }
+  if (!runtime.disponible) {
+    return {
+      nivel: "aviso",
+      html: "Sin runtime de JavaScript, YouTube puede negar algunos formatos." +
+        " Instala uno con <code>winget install DenoLand.Deno</code>.",
+      accion: false,
+    };
+  }
+  return null;
+}
+
+async function comprobarSalud() {
+  let datos;
+  try {
+    datos = await pedirJSON("/api/salud");
+  } catch (e) {
+    // Sin red o con PyPI caído no se avisa de nada: el chequeo es accesorio y
+    // no debe estorbar a quien solo quiere usar la app.
+    return;
+  }
+  estado.salud = datos;
+  pintarSalud(mensajeSalud(datos));
+}
+
+function pintarSalud(aviso) {
+  const caja = $("#aviso-salud");
+  const boton = $("#boton-actualizar");
+  if (!aviso) {
+    caja.hidden = true;
+    boton.hidden = true;
+    return;
+  }
+  $("#aviso-salud-texto").innerHTML = aviso.html;
+  caja.dataset.nivel = aviso.nivel;
+  caja.hidden = false;
+  boton.hidden = !aviso.accion;
+}
+
+async function actualizarYtDlp() {
+  const boton = $("#boton-actualizar");
+  const textoOriginal = boton.textContent;
+  boton.disabled = true;
+  boton.textContent = "Actualizando…";
+  try {
+    const resultado = await pedirJSON("/api/salud/actualizar", { method: "POST" });
+    avisar(resultado.mensaje || "yt-dlp actualizado.", "ok");
+    // Ya no hay nada que ofrecer: la actualización entra al reiniciar.
+    pintarSalud({
+      nivel: "aviso",
+      html: "yt-dlp actualizado a " + esc(resultado.version || "la última versión") +
+        ". Reinicia Sonora para usarlo.",
+      accion: false,
+    });
+  } catch (e) {
+    avisar("No se pudo actualizar: " + e.message, "error");
+    boton.disabled = false;
+    boton.textContent = textoOriginal;
+  }
+}
+
+function iniciarSalud() {
+  $("#boton-actualizar").addEventListener("click", actualizarYtDlp);
+}
+
+// ---------------------------------------------------------------------------
 // Arranque
 // ---------------------------------------------------------------------------
 
@@ -1619,7 +1720,9 @@ document.addEventListener("DOMContentLoaded", () => {
   iniciarHistorial();
   iniciarReproductor();
   iniciarDialogoCarpetas();
+  iniciarSalud();
   cargarConfig();
+  comprobarSalud();
   refrescarCola();
   iniciarSSE();
 });

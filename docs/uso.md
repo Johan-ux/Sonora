@@ -30,6 +30,27 @@ por completo.
   teclas multimedia del sistema.
 - **Historial**: consulta lo descargado anteriormente.
 
+## Aviso de actualización
+
+Al abrir Sonora se comprueba el entorno y, si algo merece tu atención, aparece
+un aviso abajo en la barra lateral:
+
+- **Hay una versión nueva de yt-dlp.** Es lo que conviene vigilar: YouTube
+  cambia a menudo y un yt-dlp viejo deja de descargar (`HTTP Error 403`). El
+  botón **Actualizar ahora** lanza `pip install --upgrade yt-dlp` desde la
+  propia app; al terminar hay que **reiniciar Sonora** para que surta efecto.
+- **Tu yt-dlp pasa de 90 días** y no se pudo consultar si hay uno más nuevo
+  (sin conexión, por ejemplo).
+- **Falta un runtime de JavaScript**, con la orden para instalarlo.
+
+Si no hay nada que decir, el aviso no se muestra. La comprobación consulta
+PyPI con un tiempo de espera corto y cachea el resultado seis horas, así que no
+retrasa el arranque; sin conexión, la app abre igual y no avisa de nada.
+
+> En la app **empaquetada** (`.exe`), yt-dlp va dentro del ejecutable y pip no
+> puede actualizarlo: el aviso lo dice y hay que reconstruirla
+> (ver [empaquetado.md](empaquetado.md)).
+
 ## Atajos de teclado
 
 | Tecla             | Acción                    |

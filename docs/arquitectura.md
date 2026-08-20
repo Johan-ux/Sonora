@@ -18,6 +18,7 @@ sonora/                    Paquete principal (app de escritorio + CLI)
 ├── utils.py               Utilidades varias (sin dependencias de Flask)
 ├── db.py                  Persistencia en SQLite (cola, historial, configuración)
 ├── sse.py                 Difusión de eventos en tiempo real (Server-Sent Events)
+├── salud.py               Chequeo del entorno (versión de yt-dlp, ffmpeg, runtime JS)
 ├── servicios/             Lógica de negocio
 │   ├── youtube.py         Búsqueda y expansión de playlists/canales/mixes (yt-dlp)
 │   ├── descargas.py       Worker de descarga + cancelación + progreso
@@ -29,7 +30,8 @@ sonora/                    Paquete principal (app de escritorio + CLI)
 │   ├── eventos.py         /api/eventos (SSE)
 │   ├── biblioteca.py      /api/biblioteca, /audio, /api/abrir-carpeta
 │   ├── carpetas.py        /api/carpetas*
-│   └── config.py          /api/config
+│   ├── config.py          /api/config
+│   └── salud.py           /api/salud, /api/salud/actualizar
 ├── templates/index.html   Interfaz (HTML)
 └── static/css, static/js  Estilos y lógica de frontend
 

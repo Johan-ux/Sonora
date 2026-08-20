@@ -283,6 +283,50 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     word-break: break-all;
 }
 
+/* Chequeo del entorno: versión de yt-dlp, ffmpeg y runtime de JavaScript.
+   Comparte el aire del aviso de ffmpeg, pero en ámbar cuando es solo una
+   recomendación (hay actualización) y en rojo cuando algo ya está roto. */
+
+.aviso-salud {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--ambar);
+    border-radius: var(--radio-s);
+    background: var(--ambar-suave);
+    color: var(--ambar);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
+/* Algo falta y ya impide descargar: mismo tratamiento que el aviso de ffmpeg. */
+.aviso-salud[data-nivel="error"] {
+    border-color: var(--error);
+    background: var(--error-suave);
+    color: var(--error);
+}
+
+.aviso-salud-texto { margin: 0; }
+
+/* 'yt-dlp' no debe partirse por su guion: en una barra de 236px el navegador
+   lo cortaría como 'yt-' / 'dlp', que se lee como un error tipográfico. */
+.aviso-salud .paquete { white-space: nowrap; }
+
+.aviso-salud code {
+    font-family: var(--fuente-mono);
+    font-size: 0.75rem;
+    word-break: break-all;
+}
+
+/* Botón compacto: la barra lateral es estrecha (236px). */
+.btn-actualizar {
+    padding: 6px 14px;
+    font-size: 0.8125rem;
+}
+
 /* ------------------------------ Topbar ---------------------------------- */
 
 .topbar {

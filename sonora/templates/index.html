@@ -56,6 +56,15 @@
             </nav>
 
             <div class="sidebar-pie">
+                <!-- Chequeo del entorno: solo se muestra si algo va mal o si
+                     hay una versión nueva de yt-dlp (la causa habitual de que
+                     las descargas dejen de funcionar). -->
+                <div class="aviso-salud" id="aviso-salud" hidden>
+                    <p class="aviso-salud-texto" id="aviso-salud-texto"></p>
+                    <button type="button" class="btn btn-ambar btn-actualizar" id="boton-actualizar" hidden>
+                        Actualizar ahora
+                    </button>
+                </div>
                 <p class="aviso-ffmpeg" id="aviso-ffmpeg" hidden>
                     <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16"><path d="M12 3 2 21h20L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="18" r="1.2" fill="currentColor"/></svg>
                     Falta ffmpeg: la conversión a MP3 fallará. Instálalo con
