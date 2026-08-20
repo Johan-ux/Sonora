@@ -4,6 +4,7 @@
 
 - **Python 3.9+** (probado con Python 3.14 en Windows 11).
 - **ffmpeg** instalado (dependencia de **sistema**, no se instala con pip).
+- **Un runtime de JavaScript** (opcional pero recomendado): ver más abajo.
 
 ## Instalar ffmpeg
 
@@ -22,6 +23,41 @@ brew install ffmpeg
 > **Windows (winget):** tras instalar ffmpeg no hace falta ni reiniciar la
 > terminal: la app **autodetecta** ffmpeg (incluida la ubicación de winget) y
 > reintenta la detección sola si lo instalas con la app abierta.
+
+## Runtime de JavaScript (recomendado)
+
+YouTube protege las URLs de sus formatos con desafíos que solo se resuelven
+ejecutando el JavaScript de su reproductor. Sin un runtime instalado, yt-dlp
+recurre a clientes alternativos: hoy funcionan, pero es la vía que yt-dlp marca
+como **deprecada** y por la que pueden faltar formatos.
+
+Basta con tener **uno** de estos en el PATH (`deno`, `node`, `bun` o `quickjs`);
+la app detecta el primero disponible y lo usa sola:
+
+```bash
+# Windows (winget)
+winget install DenoLand.Deno
+# o, si ya tienes Node.js, no hace falta instalar nada
+```
+
+La primera descarga baja además el script que resuelve el desafío
+(`ejs`, del repositorio de yt-dlp) y lo deja cacheado.
+
+> Si no hay ningún runtime, la app **sigue funcionando** por la vía
+> alternativa: no falla, solo pierde robustez.
+
+## Mantener yt-dlp al día
+
+YouTube cambia con frecuencia y **una versión vieja de yt-dlp es la causa más
+habitual de que las descargas fallen** (típicamente con `HTTP Error 403:
+Forbidden`). Si algo deja de descargar, lo primero es actualizar:
+
+```bash
+pip install --upgrade yt-dlp
+```
+
+> Si usas el `.exe` empaquetado, yt-dlp va **congelado dentro**: actualizarlo
+> exige reconstruirlo (ver [empaquetado.md](empaquetado.md)).
 
 ## Dependencias de Python
 

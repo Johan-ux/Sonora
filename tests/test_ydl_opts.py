@@ -4,16 +4,20 @@ from __future__ import annotations
 
 import pytest
 
+import sonora.ydl_opts as ydl_opts
 from sonora.ydl_opts import (
     BITRATE_POR_DEFECTO,
     BITRATES_VALIDOS,
     FORMATO_POR_DEFECTO,
     RESOLUCION_POR_DEFECTO,
     RESOLUCIONES_VALIDAS,
+    RUNTIMES_JS,
+    detectar_runtime_js,
     normalizar_bitrate,
     normalizar_formato,
     normalizar_resolucion,
     opciones_mp3,
+    opciones_runtime_js,
     opciones_video,
 )
 
@@ -116,3 +120,51 @@ class TestOpcionesVideo:
     def test_resolucion_invalida_cae_al_por_defecto(self, tmp_path):
         opciones = opciones_video(tmp_path, "9999")
         assert f"height<={RESOLUCION_POR_DEFECTO}" in opciones["format"]
+
+
+class TestRuntimeJS:
+    """Autodetección del runtime de JavaScript que resuelve las firmas."""
+
+    def test_detecta_el_primero_disponible(self, monkeypatch):
+        # Solo 'node' instalado: aunque 'deno' se prefiera, se elige node.
+        monkeypatch.setattr(
+            ydl_opts.shutil, "which", lambda nombre: "/usr/bin/node" if nombre == "node" else None
+        )
+        assert detectar_runtime_js() == "node"
+
+    def test_respeta_el_orden_de_preferencia(self, monkeypatch):
+        # Con todos instalados gana el primero de RUNTIMES_JS.
+        monkeypatch.setattr(ydl_opts.shutil, "which", lambda nombre: f"/usr/bin/{nombre}")
+        assert detectar_runtime_js() == RUNTIMES_JS[0]
+
+    def test_sin_runtime_devuelve_none(self, monkeypatch):
+        monkeypatch.setattr(ydl_opts.shutil, "which", lambda nombre: None)
+        assert detectar_runtime_js() is None
+
+    def test_opciones_incluyen_runtime_y_solver(self, monkeypatch):
+        monkeypatch.setattr(
+            ydl_opts.shutil, "which", lambda nombre: "/usr/bin/node" if nombre == "node" else None
+        )
+        opciones = opciones_runtime_js()
+        # La API de Python espera un dict {runtime: {config}}, no una lista.
+        assert opciones["js_runtimes"] == {"node": {}}
+        assert "ejs:github" in opciones["remote_components"]
+
+    def test_sin_runtime_no_aporta_opciones(self, monkeypatch):
+        monkeypatch.setattr(ydl_opts.shutil, "which", lambda nombre: None)
+        assert opciones_runtime_js() == {}
+
+    def test_bases_degradan_sin_runtime(self, monkeypatch, tmp_path):
+        # Sin runtime la app debe seguir descargando: nada de js_runtimes,
+        # y el resto de opciones intactas.
+        monkeypatch.setattr(ydl_opts.shutil, "which", lambda nombre: None)
+        for opciones in (opciones_mp3(tmp_path), opciones_video(tmp_path)):
+            assert "js_runtimes" not in opciones
+            assert "remote_components" not in opciones
+            assert opciones["format"]
+
+    def test_bases_incorporan_runtime(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(ydl_opts.shutil, "which", lambda nombre: f"/usr/bin/{nombre}")
+        for opciones in (opciones_mp3(tmp_path), opciones_video(tmp_path)):
+            assert opciones["js_runtimes"] == {RUNTIMES_JS[0]: {}}
+            assert opciones["remote_components"] == ["ejs:github"]

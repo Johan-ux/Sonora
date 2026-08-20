@@ -4,7 +4,7 @@
 # yt-dlp publica actualizaciones constantes imprescindibles para que las
 # búsquedas y descargas sigan funcionando; fijar un máximo rompería la app
 # con el paso del tiempo.
-yt-dlp>=2026.3.17
+yt-dlp>=2026.8.19
 flask>=3.0,<4
 mutagen>=1.47,<2
 pywebview>=5.0,<7
