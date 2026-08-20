@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify
 
 from .. import db, ffmpeg
+from ..servicios.descargas import MAX_SIMULTANEAS, descargas_simultaneas, normalizar_simultaneas
 from ..ydl_opts import normalizar_bitrate, normalizar_formato, normalizar_resolucion
 from .comun import cuerpo_json, ruta_relativa, texto
 
@@ -25,6 +26,8 @@ def obtener():
         "formato_por_defecto": db.config_obtener("formato_por_defecto", "audio") or "audio",
         "resolucion_por_defecto": db.config_obtener("resolucion_por_defecto", "1080") or "1080",
         "ffmpeg_disponible": ffmpeg.localizacion() is not None,
+        "descargas_simultaneas": descargas_simultaneas(),
+        "max_simultaneas": MAX_SIMULTANEAS,
     })
 
 
@@ -48,5 +51,10 @@ def guardar():
         db.config_guardar(
             "resolucion_por_defecto",
             normalizar_resolucion(texto(datos, "resolucion_por_defecto")),
+        )
+    if "descargas_simultaneas" in datos:
+        db.config_guardar(
+            "descargas_simultaneas",
+            str(normalizar_simultaneas(texto(datos, "descargas_simultaneas"))),
         )
     return jsonify({"ok": True})

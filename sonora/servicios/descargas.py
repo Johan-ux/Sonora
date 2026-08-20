@@ -1,8 +1,11 @@
 """Worker de descarga a MP3 y gestión de la cola con progreso en vivo.
 
-Un único hilo daemon procesa la cola secuencialmente. El progreso del ítem en
-curso se mantiene en memoria (``PROGRESO_ACTIVO``) y se difunde por SSE; la cola
-persistente vive en ``db``. Las opciones de yt-dlp (mejor audio, extracción a
+Varios hilos daemon procesan la cola en paralelo (tres por defecto); el
+reparto lo resuelve el reclamo atómico de la BD, no un reparto previo. Los
+fallos pasajeros se reintentan solos, y los definitivos (vídeo privado,
+bloqueado por región…) se dan por perdidos sin gastar intentos. El progreso de
+cada ítem en curso se mantiene en memoria (``PROGRESO_ACTIVO``) y se difunde
+por SSE; la cola persistente vive en ``db``. Las opciones de yt-dlp (mejor audio, extracción a
 MP3 con bitrate fijo, metadatos y carátula) se comparten con la CLI a través de
 ``sonora.ydl_opts``.
 """
@@ -10,6 +13,7 @@ MP3 con bitrate fijo, metadatos y carátula) se comparten con la CLI a través d
 from __future__ import annotations
 
 import threading
+import time
 from pathlib import Path
 
 from .. import db, ffmpeg, sse
@@ -33,11 +37,67 @@ _LOCK_PROGRESO = threading.Lock()
 # Ids cuya cancelación ha pedido el usuario mientras se descargaban.
 _CANCELACIONES: set[str] = set()
 
-# Control del worker: un único hilo daemon procesa la cola.
-_HILO_WORKER: threading.Thread | None = None
+# Workers vivos. Varios hilos daemon procesan la cola en paralelo; el
+# reparto lo resuelve el reclamo atómico de la BD, no un reparto previo.
+_HILOS: set[threading.Thread] = set()
 _LOCK_WORKER = threading.Lock()
 
+# Descargas simultáneas. Tres aprovechan bien la línea sin que YouTube empiece
+# a estrangular la conexión; el tope evita que un valor absurdo en la config
+# convierta la cola en una tormenta de peticiones.
+SIMULTANEAS_POR_DEFECTO = 3
+MAX_SIMULTANEAS = 5
+
 MENSAJE_CANCELADA = "Cancelada por el usuario"
+
+# Reintentos automáticos ante fallos pasajeros (cortes de red, 5xx, una firma
+# que caducó a mitad). Sin esto, un parpadeo de la conexión deja el ítem en
+# error esperando a que el usuario pulse reintentar a mano.
+MAX_INTENTOS = 3
+ESPERA_REINTENTO = 3.0  # segundos antes del 2º intento; se dobla en cada uno
+
+# Fragmentos que delatan un fallo definitivo: el vídeo no se va a poder
+# descargar ahora ni dentro de diez segundos, así que reintentar solo gasta
+# tiempo y hace esperar al resto de la cola.
+ERRORES_PERMANENTES = (
+    "private video",
+    "video unavailable",
+    "has been removed",
+    "removed by the uploader",
+    "members-only",
+    "join this channel",
+    "sign in to confirm your age",
+    "age-restricted",
+    # Cubre las dos formas que usa yt-dlp: "not available in your country" y
+    # "has not made this video available in your country".
+    "available in your country",
+    "blocked it in your country",
+    "who has blocked it",
+    "copyright",
+    "has been terminated",
+    "no video formats found",
+    "unsupported url",
+    "is not a valid url",
+)
+
+
+def _es_error_permanente(mensaje: str) -> bool:
+    """Indica si el error no tiene arreglo reintentando."""
+    texto = (mensaje or "").lower()
+    return any(fragmento in texto for fragmento in ERRORES_PERMANENTES)
+
+
+def _esperar_cancelable(segundos: float, item_id: str) -> None:
+    """Espera ``segundos`` comprobando la cancelación a intervalos cortos.
+
+    Un ``sleep`` largo dejaría el botón de cancelar sin efecto aparente durante
+    toda la espera entre reintentos.
+    """
+    fin = time.monotonic() + max(0.0, segundos)
+    while time.monotonic() < fin:
+        if _cancelacion_pedida(item_id):
+            raise DescargaCancelada()
+        time.sleep(min(0.25, max(0.0, fin - time.monotonic())))
 
 
 class DescargaCancelada(Exception):
@@ -80,6 +140,33 @@ def formato_por_defecto() -> str:
 def resolucion_por_defecto() -> str:
     """Resolución de vídeo configurada por el usuario, o '1080'."""
     return normalizar_resolucion(db.config_obtener("resolucion_por_defecto", "1080"))
+
+
+def normalizar_simultaneas(valor) -> int:
+    """Devuelve ``valor`` como número de descargas simultáneas válido.
+
+    Se acota a 1..``MAX_SIMULTANEAS``; cualquier cosa que no sea un número cae
+    al valor por defecto.
+    """
+    try:
+        numero = int(str(valor).strip())
+    except (TypeError, ValueError):
+        return SIMULTANEAS_POR_DEFECTO
+    return max(1, min(MAX_SIMULTANEAS, numero))
+
+
+def descargas_simultaneas() -> int:
+    """Cuántas descargas se procesan a la vez, según la configuración.
+
+    Si la configuración no se puede leer (BD aún sin inicializar, por ejemplo)
+    se usa el valor por defecto: quedarse sin workers por no poder leer una
+    preferencia sería mucho peor que ignorarla.
+    """
+    try:
+        valor = db.config_obtener("descargas_simultaneas", str(SIMULTANEAS_POR_DEFECTO))
+    except Exception:  # noqa: BLE001
+        return SIMULTANEAS_POR_DEFECTO
+    return normalizar_simultaneas(valor)
 
 
 # --------------------------------------------------------------------------- #
@@ -267,8 +354,29 @@ def _procesar_item(item: dict) -> None:
         opciones = _construir_opciones_descarga(
             carpeta_rel, formato, bitrate, resolucion, hook, pp_hook
         )
-        with yt_dlp.YoutubeDL(opciones) as ydl:
-            info = ydl.extract_info(url, download=True)
+        info = None
+        for intento in range(1, MAX_INTENTOS + 1):
+            try:
+                with yt_dlp.YoutubeDL(opciones) as ydl:
+                    info = ydl.extract_info(url, download=True)
+                break
+            except DownloadError as error:
+                # Una cancelación pedida durante la descarga aflora envuelta en
+                # DownloadError: no es un fallo que reintentar.
+                if _cancelacion_pedida(item_id):
+                    raise DescargaCancelada() from error
+                mensaje = colapsar_error(error)
+                if intento >= MAX_INTENTOS or _es_error_permanente(mensaje):
+                    raise
+                espera = ESPERA_REINTENTO * (2 ** (intento - 1))
+                sse.emitir({
+                    "tipo": "progreso",
+                    "id": item_id,
+                    "progreso": 0.0,
+                    "titulo": titulo,
+                    "mensaje": f"Falló; reintentando ({intento + 1}/{MAX_INTENTOS})…",
+                })
+                _esperar_cancelable(espera, item_id)
         if not info:
             raise RuntimeError("yt-dlp no devolvió información del vídeo.")
 
@@ -315,26 +423,28 @@ def _procesar_item(item: dict) -> None:
 
 
 def _bucle_worker() -> None:
-    """Bucle del worker: procesa la cola secuencialmente hasta vaciarla."""
-    global _HILO_WORKER
+    """Bucle de un worker: toma ítems de la cola hasta vaciarla.
+
+    Varios hilos ejecutan este bucle a la vez. No hace falta repartir el
+    trabajo entre ellos: ``db.cola_reclamar`` es atómico, así que si dos
+    workers miran el mismo ítem solo uno se lo queda y el otro sigue buscando.
+    """
     try:
         while True:
             item = db.cola_siguiente_en_cola()
             if item is None:
                 break
-            # Reclamo atómico: si el usuario eliminó el ítem entre el SELECT y
-            # aquí, cola_reclamar no afecta a ninguna fila y pasamos al
-            # siguiente en vez de descargar un ítem ya borrado.
+            # Reclamo atómico: cubre tanto al usuario que eliminó el ítem entre
+            # el SELECT y el UPDATE como al worker vecino que se le adelantó.
             if not db.cola_reclamar(item["id"]):
                 continue
             _procesar_item(item)
-    except Exception:  # noqa: BLE001 - el worker nunca debe tirar el proceso
+    except Exception:  # noqa: BLE001 - un worker nunca debe tirar el proceso
         pass
     finally:
-        # Liberamos el hilo para que pueda relanzarse si llegan más ítems.
         with _LOCK_WORKER:
-            _HILO_WORKER = None
-        # Si entró un ítem nuevo justo al terminar, relanzamos el worker.
+            _HILOS.discard(threading.current_thread())
+        # Si entró un ítem nuevo justo al terminar, se repuebla la plantilla.
         try:
             if db.cola_siguiente_en_cola() is not None:
                 arrancar_worker()
@@ -343,14 +453,21 @@ def _bucle_worker() -> None:
 
 
 def arrancar_worker() -> None:
-    """Arranca el hilo worker si no está ya corriendo (idempotente)."""
-    global _HILO_WORKER
+    """Asegura que haya tantos workers vivos como descargas simultáneas.
+
+    Idempotente: se puede llamar en cada alta de la cola. Solo crea los hilos
+    que falten para llegar al número configurado, nunca de más.
+    """
     with _LOCK_WORKER:
-        if _HILO_WORKER is not None and _HILO_WORKER.is_alive():
-            return
-        _HILO_WORKER = threading.Thread(
-            target=_bucle_worker,
-            name="worker-descargas",
-            daemon=True,
-        )
-        _HILO_WORKER.start()
+        # Los hilos que ya terminaron no cuentan para el cupo.
+        for hilo in [h for h in _HILOS if not h.is_alive()]:
+            _HILOS.discard(hilo)
+        faltan = descargas_simultaneas() - len(_HILOS)
+        for _ in range(max(0, faltan)):
+            hilo = threading.Thread(
+                target=_bucle_worker,
+                name="worker-descargas",
+                daemon=True,
+            )
+            _HILOS.add(hilo)
+            hilo.start()
