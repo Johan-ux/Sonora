@@ -62,6 +62,10 @@ intento. Los fallos definitivos (vídeo privado, borrado o bloqueado en tu
 país) no se reintentan: se marcan como error directamente, para no hacer
 esperar al resto de la cola.
 
+Al cancelar una descarga (o cuando falla del todo) se borran los ficheros a
+medias que deja yt-dlp, en lugar de quedarse ocupando sitio en la carpeta de
+música para siempre.
+
 ## Aviso de actualización
 
 Al abrir Sonora se comprueba el entorno y, si algo merece tu atención, aparece

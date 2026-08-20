@@ -3,18 +3,24 @@
 Varios hilos daemon procesan la cola en paralelo (tres por defecto); el
 reparto lo resuelve el reclamo atómico de la BD, no un reparto previo. Los
 fallos pasajeros se reintentan solos, y los definitivos (vídeo privado,
-bloqueado por región…) se dan por perdidos sin gastar intentos. El progreso de
-cada ítem en curso se mantiene en memoria (``PROGRESO_ACTIVO``) y se difunde
-por SSE; la cola persistente vive en ``db``. Las opciones de yt-dlp (mejor audio, extracción a
-MP3 con bitrate fijo, metadatos y carátula) se comparten con la CLI a través de
-``sonora.ydl_opts``.
+bloqueado por región…) se dan por perdidos sin gastar intentos. Una descarga
+interrumpida se lleva por delante sus propios ficheros a medias.
+
+El progreso de cada ítem en curso se mantiene en memoria (``PROGRESO_ACTIVO``)
+y se difunde por SSE; la cola persistente vive en ``db``. Las opciones de
+yt-dlp (mejor audio, extracción a MP3 con bitrate fijo, metadatos y carátula)
+se comparten con la CLI a través de ``sonora.ydl_opts``.
 """
 
 from __future__ import annotations
 
+import glob
 import threading
 import time
 from pathlib import Path
+
+import yt_dlp
+from yt_dlp.utils import DownloadError
 
 from .. import db, ffmpeg, sse
 from ..paths import CARPETA_DESCARGAS, rel_descargas, resolver_dentro_descargas
@@ -26,9 +32,6 @@ from ..ydl_opts import (
     opciones_mp3,
     opciones_video,
 )
-
-import yt_dlp
-from yt_dlp.utils import DownloadError
 
 # Progreso vivo del ítem que se está descargando: {id: progreso_float_0_100}.
 PROGRESO_ACTIVO: dict[str, float] = {}
@@ -85,6 +88,55 @@ def _es_error_permanente(mensaje: str) -> bool:
     """Indica si el error no tiene arreglo reintentando."""
     texto = (mensaje or "").lower()
     return any(fragmento in texto for fragmento in ERRORES_PERMANENTES)
+
+
+# Sufijos de los ficheros a medias que deja yt-dlp. La descarga en curso va a
+# '<destino>.part' (y '.part-FragN' si el formato viene fragmentado); '.ytdl'
+# guarda el estado para poder reanudar. Solo se borra lo que acabe así: el
+# resultado final nunca lleva estos sufijos.
+SUFIJOS_TEMPORALES = (".part", ".ytdl", ".temp")
+
+
+def _es_temporal(nombre: str) -> bool:
+    """Indica si ``nombre`` es un fichero intermedio de yt-dlp."""
+    if nombre.endswith(SUFIJOS_TEMPORALES):
+        return True
+    # Fragmentos: 'video.mp4.part-Frag12'.
+    return ".part-Frag" in nombre
+
+
+def _limpiar_temporales(rutas) -> int:
+    """Borra los ficheros a medias de una descarga interrumpida.
+
+    Sin esto, cancelar deja el '.part' en disco para siempre: nadie vuelve a
+    mirarlo y con el tiempo son megas invisibles en la carpeta de música.
+
+    Dos salvaguardas, porque esto borra ficheros del usuario: solo se toca lo
+    que esté DENTRO de la carpeta de descargas y solo lo que lleve sufijo de
+    temporal. Un fichero de música terminado no cumple ninguna de las dos.
+    """
+    borrados = 0
+    for ruta in rutas:
+        base = Path(ruta)
+        # Los corchetes de la plantilla ('Titulo [id].mp3') son comodines para
+        # glob; sin escaparlos, el patrón no encontraría nada.
+        patron = glob.escape(base.name) + "*"
+        try:
+            candidatos = list(base.parent.glob(patron))
+        except OSError:
+            continue
+        for candidato in candidatos:
+            if not _es_temporal(candidato.name):
+                continue
+            # rel_descargas devuelve '' —no None— para lo que cae fuera.
+            if not rel_descargas(candidato):
+                continue  # fuera de descargas/: no es nuestro
+            try:
+                candidato.unlink()
+                borrados += 1
+            except OSError:
+                pass  # otro proceso lo tiene abierto; se quedará ahí
+    return borrados
 
 
 def _esperar_cancelable(segundos: float, item_id: str) -> None:
@@ -303,12 +355,22 @@ def _procesar_item(item: dict) -> None:
     formato = normalizar_formato(item.get("formato"))
     resolucion = item.get("resolucion") or "1080"
 
+    # Rutas que yt-dlp va tocando, para poder barrer los restos si esto se
+    # interrumpe. 'filename' es el destino final y 'tmpfilename' el '.part';
+    # se guardan los dos porque el barrido parte del nombre para encontrar
+    # también el '.ytdl' y los fragmentos.
+    temporales: set[str] = set()
+
     def hook(d: dict) -> None:
         """progress_hook de yt-dlp: progreso a SSE + punto de cancelación."""
         if _cancelacion_pedida(item_id):
             raise DescargaCancelada()
         try:
             estado = d.get("status")
+            for clave in ("filename", "tmpfilename"):
+                valor = d.get(clave)
+                if valor:
+                    temporales.add(str(valor))
             if estado == "downloading":
                 total = d.get("total_bytes") or d.get("total_bytes_estimate")
                 descargado = d.get("downloaded_bytes") or 0
@@ -396,9 +458,13 @@ def _procesar_item(item: dict) -> None:
             pass
         sse.emitir({"tipo": "completado", "id": item_id, "titulo": info.get("title") or titulo})
     except DescargaCancelada:
+        _limpiar_temporales(temporales)
         db.cola_actualizar_estado(item_id, "error", MENSAJE_CANCELADA)
         sse.emitir({"tipo": "cancelado", "id": item_id, "titulo": titulo})
     except DownloadError as error:
+        # Se agotaron los intentos o el fallo era definitivo: no va a quedar
+        # nada aprovechable, así que los restos sobran.
+        _limpiar_temporales(temporales)
         # La cancelación puede aflorar envuelta en el DownloadError de yt-dlp.
         if _cancelacion_pedida(item_id):
             db.cola_actualizar_estado(item_id, "error", MENSAJE_CANCELADA)
@@ -408,6 +474,7 @@ def _procesar_item(item: dict) -> None:
             db.cola_actualizar_estado(item_id, "error", msg)
             sse.emitir({"tipo": "error", "id": item_id, "error": msg})
     except Exception as error:  # noqa: BLE001 - robustez: nunca abortar el lote
+        _limpiar_temporales(temporales)
         if _cancelacion_pedida(item_id):
             db.cola_actualizar_estado(item_id, "error", MENSAJE_CANCELADA)
             sse.emitir({"tipo": "cancelado", "id": item_id, "titulo": titulo})

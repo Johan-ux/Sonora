@@ -239,3 +239,118 @@ class TestPoolDeWorkers:
         assert len(descargas._HILOS) <= 2
         while descargas._HILOS:
             time.sleep(0.01)
+
+
+class TestLimpiezaDeTemporales:
+    """Barrido de los restos que deja una descarga interrumpida.
+
+    Estos tests borran ficheros de verdad, así que la mitad de ellos comprueba
+    lo contrario: que la música terminada NO se toca.
+    """
+
+    @pytest.mark.parametrize(
+        "nombre",
+        ["a.mp3.part", "a.mp4.part-Frag12", "a.mp3.ytdl", "a.temp"],
+    )
+    def test_reconoce_los_temporales(self, nombre):
+        assert descargas._es_temporal(nombre) is True
+
+    @pytest.mark.parametrize(
+        "nombre",
+        ["Cancion [abc123].mp3", "video.mp4", "portada.webp", "a.partitura.mp3"],
+    )
+    def test_no_confunde_un_fichero_terminado(self, nombre):
+        assert descargas._es_temporal(nombre) is False
+
+    def test_borra_los_restos_de_la_descarga(self, entorno):
+        destino = entorno / "Cancion [abc123].mp3"
+        restos = [
+            entorno / "Cancion [abc123].mp3.part",
+            entorno / "Cancion [abc123].mp3.ytdl",
+            entorno / "Cancion [abc123].mp3.part-Frag3",
+        ]
+        for r in restos:
+            r.write_bytes(b"a medias")
+
+        borrados = descargas._limpiar_temporales({str(destino)})
+
+        assert borrados == 3
+        assert not any(r.exists() for r in restos)
+
+    def test_no_toca_la_musica_terminada(self, entorno):
+        cancion = entorno / "Cancion [abc123].mp3"
+        cancion.write_bytes(b"musica de verdad")
+        vecina = entorno / "Cancion [abc123].mp3.backup"
+        vecina.write_bytes(b"tampoco es temporal")
+
+        descargas._limpiar_temporales({str(cancion)})
+
+        # Lo que no lleva sufijo de temporal se queda donde está.
+        assert cancion.read_bytes() == b"musica de verdad"
+        assert vecina.exists()
+
+    def test_los_corchetes_del_nombre_no_rompen_la_busqueda(self, entorno):
+        # La plantilla mete el id entre corchetes, que para glob son una clase
+        # de caracteres: sin escaparlos, el patrón no encontraría nada.
+        resto = entorno / "Tema [xY-9_z].mp3.part"
+        resto.write_bytes(b"a medias")
+
+        borrados = descargas._limpiar_temporales({str(entorno / "Tema [xY-9_z].mp3")})
+
+        assert borrados == 1
+        assert not resto.exists()
+
+    def test_ignora_lo_que_esta_fuera_de_descargas(self, entorno, tmp_path):
+        fuera = tmp_path / "ajeno.mp3.part"
+        fuera.write_bytes(b"no es nuestro")
+
+        borrados = descargas._limpiar_temporales({str(tmp_path / "ajeno.mp3")})
+
+        # Aunque el nombre encaje, fuera de descargas/ no se toca nada.
+        assert borrados == 0
+        assert fuera.exists()
+
+    def test_una_ruta_inexistente_no_revienta(self, entorno):
+        assert descargas._limpiar_temporales({str(entorno / "no-existe.mp3")}) == 0
+
+    def test_cancelar_dispara_el_barrido(self, entorno, ydl_falso, monkeypatch):
+        llamadas = []
+        monkeypatch.setattr(
+            descargas, "_limpiar_temporales", lambda rutas: llamadas.append(set(rutas)) or 0
+        )
+        db.cola_agregar(_item())
+        db.cola_reclamar("i1")
+        ydl_falso.programar([DownloadError("cancelado")])
+        monkeypatch.setattr(descargas, "_cancelacion_pedida", lambda item_id: True)
+
+        descargas._procesar_item(_item())
+
+        assert llamadas, "cancelar debe barrer los restos"
+        assert db.cola_listar()[0]["error"] == descargas.MENSAJE_CANCELADA
+
+    def test_un_error_definitivo_dispara_el_barrido(self, entorno, ydl_falso, monkeypatch):
+        llamadas = []
+        monkeypatch.setattr(
+            descargas, "_limpiar_temporales", lambda rutas: llamadas.append(set(rutas)) or 0
+        )
+        db.cola_agregar(_item())
+        db.cola_reclamar("i1")
+        ydl_falso.programar([DownloadError("ERROR: Private video")])
+
+        descargas._procesar_item(_item())
+
+        assert llamadas, "un fallo definitivo no deja nada aprovechable que conservar"
+
+    def test_una_descarga_correcta_no_barre_nada(self, entorno, ydl_falso, monkeypatch):
+        llamadas = []
+        monkeypatch.setattr(
+            descargas, "_limpiar_temporales", lambda rutas: llamadas.append(set(rutas)) or 0
+        )
+        db.cola_agregar(_item())
+        db.cola_reclamar("i1")
+        ydl_falso.programar([])  # sin fallos
+
+        descargas._procesar_item(_item())
+
+        assert not llamadas, "tras un éxito no hay restos que barrer"
+        assert db.cola_listar()[0]["estado"] == "completado"
