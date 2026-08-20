@@ -138,7 +138,9 @@ class TestUltimaVersionPypi:
             def read(self):
                 return b"esto no es json"
 
-        monkeypatch.setattr(salud.urllib.request, "urlopen", lambda p, timeout=None: RespuestaRara())
+        monkeypatch.setattr(
+            salud.urllib.request, "urlopen", lambda p, timeout=None: RespuestaRara()
+        )
         assert salud.ultima_version_pypi() == ""
 
 

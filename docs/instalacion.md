@@ -73,11 +73,19 @@ pip install -r requirements.txt
 Dependencias principales (ver [`requirements.txt`](../requirements.txt)):
 `yt-dlp`, `flask`, `mutagen` y `pywebview`.
 
-Para ejecutar los tests hace falta además `pytest`:
+Para ejecutar los tests y el linter hacen falta además `pytest` y `ruff`:
 
 ```bash
 pip install -r requirements-dev.txt
+
+python -m pytest              # tests
+python -m ruff check sonora tests   # linter
 ```
+
+Ambos se ejecutan también en CI, sobre Ubuntu y Windows. Las reglas de ruff
+están en [`pyproject.toml`](../pyproject.toml): se silencian a propósito las
+que chocan con decisiones tomadas a conciencia en este proyecto (los `except`
+amplios del worker, por ejemplo, que llevan su `# noqa` explicando el porqué).
 
 ## Dónde se guardan tus datos
 

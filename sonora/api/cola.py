@@ -158,7 +158,12 @@ def agregar_playlist():
         # Un único lote con nombre explícito (añadir un lote concreto).
         _agregar_lote(validas, uuid.uuid4().hex[:12], nombre_lote)
         descargas.emitir_cola_actualizada()
-        return jsonify({"ok": True, "lotes": lotes_con_items, "total": len(ids), "omitidas": omitidas})
+        return jsonify({
+            "ok": True,
+            "lotes": lotes_con_items,
+            "total": len(ids),
+            "omitidas": omitidas,
+        })
 
     # Reparto automático en lotes de 'tam' canciones.
     try:

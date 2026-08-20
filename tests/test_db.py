@@ -7,7 +7,11 @@ import sqlite3
 from sonora import db
 
 
-def _item(item_id: str = "abc123", url: str = "https://www.youtube.com/watch?v=abc", **extra) -> dict:
+def _item(
+    item_id: str = "abc123",
+    url: str = "https://www.youtube.com/watch?v=abc",
+    **extra,
+) -> dict:
     base = {
         "id": item_id,
         "url": url,

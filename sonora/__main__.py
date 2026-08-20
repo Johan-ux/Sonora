@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Punto de entrada ejecutable del paquete: ``python -m sonora``.
 
 Es además el script que PyInstaller empaqueta (ver ``scripts/sonora.spec``).

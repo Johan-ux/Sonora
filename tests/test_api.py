@@ -366,14 +366,16 @@ class TestBibliotecaEliminar:
     def test_borra_mp4(self, client, entorno):
         f = entorno / "clip.mp4"
         f.write_bytes(b"\x00\x00\x00\x18ftyp")
-        assert client.post("/api/biblioteca/eliminar", json={"archivo": "clip.mp4"}).status_code == 200
+        respuesta = client.post("/api/biblioteca/eliminar", json={"archivo": "clip.mp4"})
+        assert respuesta.status_code == 200
         assert not f.exists()
 
     def test_sin_archivo_devuelve_400(self, client, entorno):
         assert client.post("/api/biblioteca/eliminar", json={}).status_code == 400
 
     def test_inexistente_devuelve_404(self, client, entorno):
-        assert client.post("/api/biblioteca/eliminar", json={"archivo": "no.mp3"}).status_code == 404
+        respuesta = client.post("/api/biblioteca/eliminar", json={"archivo": "no.mp3"})
+        assert respuesta.status_code == 404
 
     def test_traversal_no_borra_fuera(self, client, entorno, tmp_path):
         externo = tmp_path / "secreto.mp3"
@@ -385,4 +387,5 @@ class TestBibliotecaEliminar:
 
     def test_extension_no_permitida_devuelve_403(self, client, entorno):
         (entorno / "nota.txt").write_text("x", encoding="utf-8")
-        assert client.post("/api/biblioteca/eliminar", json={"archivo": "nota.txt"}).status_code == 403
+        respuesta = client.post("/api/biblioteca/eliminar", json={"archivo": "nota.txt"})
+        assert respuesta.status_code == 403

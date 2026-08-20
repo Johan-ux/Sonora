@@ -12,19 +12,19 @@ import queue
 import threading
 
 # Una cola por cliente SSE conectado; protegido por su propio lock.
-_CLIENTES: "set[queue.Queue[str]]" = set()
+_CLIENTES: set[queue.Queue[str]] = set()
 _LOCK = threading.Lock()
 
 
-def registrar_cliente() -> "queue.Queue[str]":
+def registrar_cliente() -> queue.Queue[str]:
     """Crea y registra una cola para un nuevo cliente SSE."""
-    cliente: "queue.Queue[str]" = queue.Queue(maxsize=200)
+    cliente: queue.Queue[str] = queue.Queue(maxsize=200)
     with _LOCK:
         _CLIENTES.add(cliente)
     return cliente
 
 
-def eliminar_cliente(cliente: "queue.Queue[str]") -> None:
+def eliminar_cliente(cliente: queue.Queue[str]) -> None:
     """Da de baja un cliente SSE (al desconectarse)."""
     with _LOCK:
         _CLIENTES.discard(cliente)

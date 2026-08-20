@@ -17,8 +17,8 @@ from ..utils import formatear_duracion
 # mutagen se usa para leer los tags de los MP3. Si falla la importación, la
 # biblioteca sigue funcionando usando el nombre del fichero como título.
 try:
-    from mutagen.mp3 import MP3
     from mutagen.easyid3 import EasyID3
+    from mutagen.mp3 import MP3
 except ImportError:  # pragma: no cover
     MP3 = None
     EasyID3 = None

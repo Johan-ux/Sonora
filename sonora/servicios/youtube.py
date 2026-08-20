@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import re
 
-from .. import ffmpeg
-from ..utils import formatear_duracion, thumbnail_desde_id
-
 # Si falta yt-dlp, el ImportError se propaga hasta el punto de entrada
 # (sonora.escritorio / sonora.cli), que es quien sabe mostrar el error al
 # usuario. Un módulo de biblioteca nunca debe terminar el proceso al importarse.
 import yt_dlp
+
+from .. import ffmpeg
+from ..utils import formatear_duracion, thumbnail_desde_id
 
 # Tope de seguridad de canciones que se traen al expandir una playlist.
 # Generoso para cubrir playlists grandes; luego se descargan en lotes pequeños.
@@ -20,7 +20,7 @@ MAX_PLAYLIST = 1000
 def es_url(texto: str) -> bool:
     """Indica si el texto parece una URL http(s)."""
     t = (texto or "").strip().lower()
-    return t.startswith("http://") or t.startswith("https://")
+    return t.startswith(("http://", "https://"))
 
 
 def es_url_playlist(texto: str) -> bool:
@@ -63,7 +63,12 @@ def _entrada_a_resultado(entrada: dict) -> dict:
         "id": vid,
         "url": url,
         "titulo": entrada.get("title") or "(sin título)",
-        "canal": entrada.get("uploader") or entrada.get("channel") or entrada.get("uploader_id") or "",
+        "canal": (
+            entrada.get("uploader")
+            or entrada.get("channel")
+            or entrada.get("uploader_id")
+            or ""
+        ),
         "duracion": formatear_duracion(entrada.get("duration")),
         "thumbnail": thumbnail,
     }

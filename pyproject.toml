@@ -12,3 +12,41 @@ addopts = "-q"
 # La raíz del repositorio en sys.path para que los tests importen 'sonora'
 # sin instalar el paquete.
 pythonpath = ["."]
+
+# ─────────────────────────────── Ruff (lint) ───────────────────────────────
+# El objetivo es que el linter avise de lo que de verdad importa aquí y calle
+# sobre las decisiones que el proyecto ya tomó a conciencia.
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",    # errores de estilo (pycodestyle)
+    "F",    # errores reales (pyflakes)
+    "I",    # imports ordenados
+    "UP",   # modernización de sintaxis
+    "B",    # bugbear: trampas frecuentes
+    "SIM",  # simplificaciones
+    "C4",   # comprehensions
+    "PIE",  # misceláneos
+    "RUF",  # reglas propias de ruff
+    "BLE",  # 'except Exception' a secas
+]
+ignore = [
+    # El worker y los hooks capturan a lo ancho A PROPÓSITO: un fallo al
+    # escribir el historial no puede tumbar una descarga. Cada sitio lleva su
+    # '# noqa: BLE001' explicando por qué, y BLE001 sigue activo para que un
+    # 'except Exception' nuevo sin justificar sí salte.
+    "SIM105",  # 'contextlib.suppress' oculta el comentario que explica el porqué
+    # La interfaz y los comentarios están en español y usan '…', '＋' o '·';
+    # marcarlos como caracteres ambiguos es ruido en este proyecto.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Los dobles de test declaran estado mutable de clase a propósito.
+"tests/*" = ["RUF012"]

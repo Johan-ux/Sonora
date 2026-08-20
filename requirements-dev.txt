@@ -1,3 +1,6 @@
 # Dependencias de desarrollo (tests). Incluye las de producción.
 -r requirements.txt
 pytest>=8,<9
+# El linter va acotado a propósito: una versión nueva puede estrenar
+# reglas y volver rojo un CI que no se ha tocado.
+ruff>=0.16,<0.17

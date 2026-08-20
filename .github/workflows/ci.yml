@@ -26,5 +26,8 @@ jobs:
       - name: Compilar (comprobación de sintaxis)
         run: python -m compileall sonora
 
+      - name: Lint (ruff)
+        run: python -m ruff check sonora tests
+
       - name: Tests
         run: python -m pytest

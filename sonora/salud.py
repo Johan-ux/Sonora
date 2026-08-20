@@ -56,7 +56,7 @@ def empaquetada() -> bool:
 def version_instalada() -> str:
     """Versión de yt-dlp instalada, o '' si no se puede determinar."""
     try:
-        import yt_dlp  # noqa: PLC0415 - perezoso: este módulo no debe exigirlo
+        import yt_dlp
 
         return str(yt_dlp.version.__version__)
     except Exception:  # noqa: BLE001 - sin yt-dlp el resto del chequeo sigue
@@ -99,7 +99,7 @@ def dias_de_antiguedad(version: str) -> int:
     if len(partes) < 3:
         return -1
     try:
-        import datetime  # noqa: PLC0415 - solo hace falta aquí
+        import datetime
 
         publicada = datetime.date(partes[0], partes[1], partes[2])
     except (ValueError, TypeError):

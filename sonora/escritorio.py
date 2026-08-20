@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Lanzador de la app de escritorio "Sonora".
 
@@ -60,7 +59,7 @@ def arrancar_servidor(app, puerto: int) -> None:
             use_reloader=False,
             threaded=True,
         )
-    except Exception as exc:  # pragma: no cover - el hilo no debe tumbar el proceso
+    except Exception as exc:  # noqa: BLE001 # pragma: no cover - no tumbar el proceso
         # Si el servidor muere, lo registramos por stderr (visible en dev).
         # La ventana detectará que '/' no responde y mostrará el fallo de espera.
         print(f"[desktop] El servidor Flask se detuvo: {exc}", file=sys.stderr)

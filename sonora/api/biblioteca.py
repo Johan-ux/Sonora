@@ -109,7 +109,7 @@ def abrir_carpeta():
                 # En Windows abre el Explorador y selecciona el archivo.
                 subprocess.Popen(["explorer", "/select,", os.path.normpath(str(destino))])
             else:
-                os.startfile(str(carpeta))  # noqa: S606 - ruta validada bajo descargas
+                os.startfile(str(carpeta))
         elif sys.platform == "darwin":
             subprocess.Popen(["open", str(carpeta)])
         else:

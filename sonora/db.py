@@ -87,7 +87,7 @@ def _fila_a_dict(fila: sqlite3.Row | None) -> dict | None:
     """Convierte una ``sqlite3.Row`` en un ``dict`` JSON-serializable."""
     if fila is None:
         return None
-    return {clave: fila[clave] for clave in fila.keys()}
+    return {clave: fila[clave] for clave in fila.keys()}  # noqa: SIM118
 
 
 # --- API pública -----------------------------------------------------------

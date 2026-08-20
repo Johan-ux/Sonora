@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from flask import Flask
 
-from . import biblioteca, busqueda, carpetas, config, cola, eventos, salud, vistas
+from . import biblioteca, busqueda, carpetas, cola, config, eventos, salud, vistas
 
 _MODULOS = (vistas, busqueda, cola, eventos, biblioteca, carpetas, config, salud)
 
