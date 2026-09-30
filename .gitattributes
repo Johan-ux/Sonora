@@ -1,0 +1,12 @@
+# Finales de línea: LF en el repositorio y en el árbol de trabajo, igual en
+# Windows, Linux y macOS (core.autocrlf=true dejaría CRLF en Windows).
+* text=auto eol=lf
+
+# Los .bat necesitan CRLF: cmd.exe falla con etiquetas/goto si llevan LF.
+*.bat text eol=crlf
+
+# Binarios: que git no intente normalizar nada dentro.
+*.png binary
+*.ico binary
+*.db binary
+*.mp3 binary
