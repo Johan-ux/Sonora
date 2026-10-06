@@ -104,6 +104,31 @@ def reportar_error(mensaje: str) -> None:
             pass
 
 
+def crear_puente_pantalla_completa(ventana):
+    """Devuelve la función que la interfaz llama al entrar o salir de pantalla completa.
+
+    Cuando una página pide pantalla completa, WebView2 solo estira el elemento
+    hasta ocupar la *ventana*: quitar el marco y ocupar el monitor le toca a la
+    aplicación anfitriona, y pywebview no lo hace por su cuenta. La interfaz
+    avisa aquí en cada ``fullscreenchange`` y la ventana la acompaña.
+
+    ``ventana.toggle_fullscreen()`` solo sabe alternar, así que el estado se
+    lleva aquí para que dos avisos iguales seguidos no lo desparejen.
+    """
+    cerrojo = threading.Lock()
+    estado = {"completa": False}
+
+    def pantalla_completa(activar) -> bool:
+        activar = bool(activar)
+        with cerrojo:
+            if activar != estado["completa"]:
+                estado["completa"] = activar
+                ventana.toggle_fullscreen()
+        return activar
+
+    return pantalla_completa
+
+
 def main() -> int:
     """Orquesta el arranque: servidor en hilo daemon + ventana pywebview."""
     # Importamos pywebview aquí para poder dar un mensaje de instalación claro
@@ -161,13 +186,15 @@ def main() -> int:
         return 1
 
     # Creamos la ventana nativa apuntando al servidor local.
-    webview.create_window(
+    ventana = webview.create_window(
         TITULO_VENTANA,
         url_base,
         width=ANCHO_VENTANA,
         height=ALTO_VENTANA,
         min_size=(ANCHO_MINIMO, ALTO_MINIMO),
     )
+    # Disponible en la interfaz como ``pywebview.api.pantalla_completa(bool)``.
+    ventana.expose(crear_puente_pantalla_completa(ventana))
 
     # webview.start() bloquea en el hilo principal hasta que se cierra la ventana.
     # Al volver, el proceso termina y los hilos daemon (servidor) mueren con él.

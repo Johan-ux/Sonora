@@ -65,6 +65,16 @@ requirements-dev.txt       Dependencias de desarrollo (pytest)
 - **El servidor solo escucha en `127.0.0.1`** y en un puerto libre elegido en
   cada arranque; el hilo del servidor es *daemon*, así que muere al cerrar la
   ventana.
+- **Las preferencias de la interfaz se guardan en el backend**, no en el
+  `localStorage` del navegador: la ventana usa un perfil privado y el puerto
+  cambia en cada arranque, así que lo que guarde la página no sobrevive al
+  cierre. El volumen y la posición, tamaño y modo de la ventana de vídeo pasan
+  por `/api/config` como el resto de la configuración.
+- **La pantalla completa la pone la ventana, no la página.** WebView2 solo
+  estira el elemento hasta el borde de la ventana; `escritorio.py` expone
+  `pantalla_completa()` a la interfaz, que la llama en cada `fullscreenchange`
+  para que la ventana ocupe de verdad el monitor (también con el reproductor de
+  la vista previa).
 
 ## Tests y CI
 

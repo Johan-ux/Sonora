@@ -84,6 +84,11 @@ function debounce(fn, ms) {
   };
 }
 
+// Acota v al intervalo [min, max].
+function limitar(v, min, max) {
+  return Math.min(max, Math.max(min, v));
+}
+
 // Aviso no bloqueante (toast) en la región viva #avisos (aria-live="polite").
 function avisar(mensaje, tipo) {
   const cont = $("#avisos");
@@ -159,6 +164,13 @@ const estado = {
     historialAleatorio: [],     // índices ya sonados en modo aleatorio (para "anterior")
     arrastrandoSeek: false,
   },
+  video: {
+    modo: "flotante",           // 'flotante' | 'teatro' (persistido en el backend)
+    geometria: null,            // {x, y, lado} elegidos a mano; null = esquina por defecto
+    proporcion: 16 / 9,         // ancho/alto del vídeo actual (fija el alto de la ventana)
+    velocidad: 1,               // velocidad elegida para los vídeos (no se persiste)
+    previa: null,               // resultado del buscador en vista previa ({id, origen}) o null
+  },
   dialogo: {
     ruta: "",                   // carpeta que muestra el explorador
   },
@@ -169,12 +181,18 @@ const estado = {
 // muestra la carátula/estado en la barra. Un solo elemento evita duplicar la
 // lógica de transporte y re-parentar un medio en reproducción.
 const audio = $("#media");
+const escenario = $("#escenario-video");
 
 // ---------------------------------------------------------------------------
 // Navegación entre vistas
 // ---------------------------------------------------------------------------
 
 function cambiarVista(nombre) {
+  // En modo teatro el vídeo tapa las vistas: al navegar vuelve a la ventana
+  // flotante para que se vea adónde se ha ido.
+  if (!escenario.hidden && estado.video.modo === "teatro") {
+    fijarModoVideo("flotante");
+  }
   estado.vista = nombre;
   $$(".nav-item").forEach((btn) => {
     if (btn.dataset.vista === nombre) {
@@ -214,6 +232,11 @@ async function cargarConfig() {
     estado.resolucion = cfg.resolucion_por_defecto || "1080";
     estado.simultaneas = cfg.descargas_simultaneas || 3;
     estado.ffmpegDisponible = Boolean(cfg.ffmpeg_disponible);
+    // Preferencias del reproductor (el evento 'volumechange' pinta los deslizadores).
+    audio.volume = typeof cfg.volumen === "number" ? limitar(cfg.volumen, 0, 1) : 1;
+    estado.video.modo = cfg.video_modo === "teatro" ? "teatro" : "flotante";
+    estado.video.geometria = cfg.video_geometria || null;
+    reflejarEscenario();
     $("#select-bitrate").value = estado.bitrate;
     $("#select-resolucion").value = estado.resolucion;
     $("#select-simultaneas").value = String(estado.simultaneas);
@@ -1194,14 +1217,22 @@ function reproducirLista(items, indice) {
 function reproducirActual() {
   const pista = estado.rep.lista[estado.rep.indice];
   if (!pista) return;
+  cerrarPreview(); // la biblioteca recupera el sonido y la ventana de vídeo
   estado.rep.archivo = pista.archivo;
   estado.rep.tipo = pista.tipo === "video" ? "video" : "audio";
   audio.src = urlAudio(pista.archivo);
+  // La velocidad elegida solo vale para los vídeos (su selector vive en el
+  // escenario); la música suena siempre a velocidad normal.
+  const velocidad = estado.rep.tipo === "video" ? estado.video.velocidad : 1;
+  audio.defaultPlaybackRate = velocidad;
+  audio.playbackRate = velocidad;
   const promesa = audio.play();
   if (promesa && promesa.catch) {
     promesa.catch((e) => {
       // Cambiar de pista rápido aborta el play() anterior: no es un error real.
       if (e && e.name === "AbortError") return;
+      // Un medio que no carga ya lo cuenta el evento 'error', y en español.
+      if (e && e.name === "NotSupportedError") return;
       avisar("No se pudo reproducir: " + (e && e.message ? e.message : e), "error");
     });
   }
@@ -1230,22 +1261,364 @@ function actualizarBarraReproductor(pista) {
 }
 
 // --------------------------- Escenario de vídeo --------------------------- //
+//
+// El vídeo se ve de tres maneras: en una ventana flotante que se coloca y se
+// dimensiona a mano (arrastrando su barra o sus bordes), en modo teatro (toda
+// la zona de contenido) o a pantalla completa. La posición, el tamaño y el
+// modo se guardan en la configuración del backend, igual que el volumen: la
+// ventana de la app usa un perfil privado y un puerto distinto en cada
+// arranque, así que localStorage no sobrevive al cierre.
+//
+// La misma ventana sirve a los vídeos de la biblioteca y a la vista previa de
+// los resultados del buscador (el reproductor incrustado de YouTube): solo se
+// ve una de las dos cosas a la vez y comparten posición, tamaño y modo.
+
+const VIDEO_LADO_POR_DEFECTO = 480;   // px (o el 44 % de la ventana si es menos)
+const VIDEO_ANCHO_MINIMO = 280;       // px: por debajo no caben los controles
+const VIDEO_PASO_TECLADO = 24;        // px por pulsación al mover o redimensionar
+const VIDEO_ESPERA_CONTROLES = 2600;  // ms sin actividad antes de esconderlos
+
+function enPantallaCompleta() {
+  return document.fullscreenElement === escenario;
+}
+
+// Zona en la que puede vivir la ventana flotante: toda la ventana de la app
+// salvo la barra de reproducción, que debe quedar siempre a mano.
+function zonaVideo() {
+  return {
+    ancho: window.innerWidth,
+    alto: window.innerHeight - $("#reproductor").offsetHeight,
+  };
+}
+
+// Alto de lo que rodea a la imagen: la barra de título y, en la vista previa,
+// el pie con el botón de añadir a la cola.
+function altoCromoVideo() {
+  return $("#ev-barra").offsetHeight + $("#ev-pie").offsetHeight;
+}
+
+// La ventana toma la forma de lo que enseña (vertical, 4:3, panorámico…).
+function fijarProporcionVideo(proporcion) {
+  estado.video.proporcion = limitar(proporcion, 0.4, 3);
+  escenario.style.setProperty("--ev-proporcion", String(estado.video.proporcion));
+  aplicarGeometriaVideo();
+}
+
+// Tamaño que el usuario quiere para la ventana, medido en el LADO LARGO de la
+// imagen: así un vídeo vertical ocupa más o menos lo mismo que uno apaisado
+// en lugar de dispararse en altura. Lo que se pinta puede ser menor.
+function ladoVideoDeseado() {
+  return estado.video.geometria
+    ? estado.video.geometria.lado
+    : Math.min(VIDEO_LADO_POR_DEFECTO, zonaVideo().ancho * 0.44);
+}
+
+// Parte del lado largo que corresponde al ancho (1 salvo en vídeos verticales).
+function factorAnchoVideo() {
+  return Math.min(1, estado.video.proporcion);
+}
+
+// Encaja la geometría deseada en la zona disponible respetando la proporción
+// del vídeo. Devuelve lo que se pinta SIN tocar la preferencia: una ventana
+// pequeña o un vídeo vertical la estrechan solo mientras duren.
+function encajarGeometriaVideo() {
+  const deseada = estado.video.geometria;
+  const zona = zonaVideo();
+  const altoCromo = altoCromoVideo();
+  const prop = estado.video.proporcion;
+  const maximo = Math.max(1, Math.min(zona.ancho, (zona.alto - altoCromo) * prop));
+  const ancho = limitar(
+    ladoVideoDeseado() * factorAnchoVideo(),
+    Math.min(VIDEO_ANCHO_MINIMO, maximo),
+    maximo
+  );
+  const alto = altoCromo + ancho / prop;
+  // Sin posición elegida: esquina inferior derecha, sobre la barra de reproducción.
+  const x = deseada ? deseada.x : zona.ancho - ancho - 18;
+  const y = deseada ? deseada.y : zona.alto - alto - 14;
+  return {
+    x: limitar(x, 0, Math.max(0, zona.ancho - ancho)),
+    y: limitar(y, 0, Math.max(0, zona.alto - alto)),
+    ancho: ancho,
+  };
+}
+
+function aplicarGeometriaVideo() {
+  if (escenario.hidden) return;
+  if (estado.video.modo !== "flotante" || enPantallaCompleta()) {
+    // Teatro y pantalla completa se colocan solos desde el CSS.
+    escenario.style.left = "";
+    escenario.style.top = "";
+    escenario.style.width = "";
+    return;
+  }
+  const g = encajarGeometriaVideo();
+  escenario.style.left = g.x + "px";
+  escenario.style.top = g.y + "px";
+  escenario.style.width = g.ancho + "px";
+}
+
+const guardarGeometriaVideo = debounce(() => {
+  guardarConfig({ video_geometria: estado.video.geometria });
+}, 400);
+
+// Da por buena la geometría tras un gesto: se guarda lo que quedó en pantalla,
+// no hasta dónde llegó el puntero. Al mover se conserva el tamaño deseado (una
+// ventana de la app pequeña no debe encoger el vídeo para siempre).
+function asentarGeometriaVideo(conservarLado) {
+  const g = encajarGeometriaVideo();
+  estado.video.geometria = {
+    x: g.x,
+    y: g.y,
+    lado: conservarLado ? ladoVideoDeseado() : g.ancho / factorAnchoVideo(),
+  };
+  aplicarGeometriaVideo();
+  guardarGeometriaVideo();
+}
+
+// Devuelve la ventana a su esquina y tamaño por defecto.
+function restablecerGeometriaVideo() {
+  estado.video.geometria = null;
+  aplicarGeometriaVideo();
+  guardarGeometriaVideo();
+}
+
+function fijarModoVideo(modo) {
+  if (estado.video.modo === modo) return;
+  estado.video.modo = modo;
+  guardarConfig({ video_modo: modo });
+  reflejarEscenario();
+}
+
+function alternarTeatro() {
+  if (enPantallaCompleta()) return;
+  fijarModoVideo(estado.video.modo === "teatro" ? "flotante" : "teatro");
+}
+
+// Pantalla completa sobre el escenario entero (no sobre el <video>), para que
+// sigan a la vista nuestros controles en lugar de los nativos del navegador.
+function alternarPantallaCompleta() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else if (escenario.requestFullscreen) {
+    escenario.requestFullscreen().catch(() => {});
+  }
+}
+
+// Pone el escenario acorde con su modo: clases, botones, foco y geometría.
+function reflejarEscenario() {
+  const completa = enPantallaCompleta();
+  const teatro = estado.video.modo === "teatro";
+  escenario.classList.toggle("modo-teatro", teatro);
+  const btnTeatro = $("#btn-video-teatro");
+  btnTeatro.setAttribute("aria-pressed", String(teatro));
+  btnTeatro.hidden = completa; // a pantalla completa no hay teatro que alternar
+  const btnPantalla = $("#btn-video-pantalla");
+  btnPantalla.setAttribute("aria-pressed", String(completa));
+  btnPantalla.querySelector(".icono-entrar").toggleAttribute("hidden", completa);
+  btnPantalla.querySelector(".icono-salir").toggleAttribute("hidden", !completa);
+  // Vista previa: el reproductor de YouTube ocupa el marco, con su pie y su
+  // botón de cerrar en lugar del de ocultar.
+  const previa = Boolean(estado.video.previa);
+  escenario.classList.toggle("es-previa", previa);
+  $("#ev-previa").hidden = !previa;
+  $("#ev-pie").hidden = !previa;
+  $("#btn-video-ocultar").hidden = previa;
+  $("#btn-preview-cerrar").hidden = !previa;
+  // Lo que el vídeo tapa no debe recibir el foco ni clics a ciegas.
+  $(".principal").inert = !escenario.hidden && (teatro || completa);
+  $(".sidebar").inert = completa;
+  $("#reproductor").inert = completa;
+  aplicarGeometriaVideo();
+}
 
 function mostrarEscenarioVideo(pista) {
+  cerrarPreview(); // la ventana es una sola: la vista previa la cede
   estado.rep.videoVisible = true;
-  $("#escenario-video").hidden = false;
+  escenario.hidden = false;
   $("#ev-titulo").textContent = pista ? pista.titulo : "";
   $("#btn-mostrar-video").hidden = true;
+  // La vista previa pudo dejar la ventana apaisada: recupera la forma del vídeo.
+  if (audio.videoWidth && audio.videoHeight) {
+    fijarProporcionVideo(audio.videoWidth / audio.videoHeight);
+  }
+  reflejarEscenario();
+  despertarControlesVideo();
 }
 
 // Oculta el escenario. La reproducción (audio del vídeo) sigue salvo que
 // ``pausar`` sea true.
 function ocultarEscenarioVideo(pausar) {
   estado.rep.videoVisible = false;
-  $("#escenario-video").hidden = true;
+  // Si la ventana la ocupa la vista previa, este vídeo ya no estaba a la vista.
+  if (!estado.video.previa) {
+    if (enPantallaCompleta()) document.exitFullscreen();
+    escenario.hidden = true;
+    reflejarEscenario();
+  }
   if (pausar) audio.pause();
   // Si lo que suena es un vídeo, ofrecemos volver a mostrarlo.
   $("#btn-mostrar-video").hidden = !(estado.rep.tipo === "video" && estado.rep.archivo);
+}
+
+let temporizadorControlesVideo = null;
+
+// Enseña los controles del vídeo y programa su ocultación. En pausa se quedan
+// a la vista, y también mientras se usan: con el foco del teclado dentro, con
+// el puntero encima o arrastrando la posición.
+function despertarControlesVideo() {
+  escenario.classList.remove("inactivo");
+  clearTimeout(temporizadorControlesVideo);
+  // La vista previa no tiene controles nuestros que esconder.
+  if (audio.paused || estado.video.previa) return;
+  temporizadorControlesVideo = setTimeout(() => {
+    const enUso = estado.rep.arrastrandoSeek ||
+      escenario.querySelector(":focus-visible, .ev-controles:hover, .ev-barra:hover");
+    if (enUso) {
+      despertarControlesVideo();
+    } else {
+      escenario.classList.add("inactivo");
+    }
+  }, VIDEO_ESPERA_CONTROLES);
+}
+
+// Mensaje sobre el vídeo (no se puede reproducir, no trae imagen…); '' lo quita.
+function avisoVideo(mensaje) {
+  const caja = $("#ev-aviso");
+  caja.textContent = mensaje;
+  caja.hidden = !mensaje;
+}
+
+// Mover (arrastrando la barra) y redimensionar (tirando de los bordes) la
+// ventana flotante, con alternativa de teclado en el botón de agarre.
+function iniciarVentanaVideo() {
+  const barra = $("#ev-barra");
+  const asas = $$("#escenario-video .ev-asa");
+  let gesto = null; // gesto de puntero en curso
+
+  function empezar(e, dir) {
+    if (e.button !== 0 || estado.video.modo !== "flotante" || enPantallaCompleta()) return;
+    const r = escenario.getBoundingClientRect();
+    gesto = {
+      dir: dir, // asa de la que se tira; '' si se mueve la ventana entera
+      x0: e.clientX,
+      y0: e.clientY,
+      caja: { x: r.left, y: r.top, ancho: r.width, alto: r.height },
+      ladoDeseado: ladoVideoDeseado(),
+      movido: false,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault(); // sin selección de texto ni arrastre nativo
+  }
+
+  // Geometría resultante de tirar de un asa. La proporción manda (el alto
+  // sigue al ancho) y el borde opuesto al asa se queda donde estaba.
+  function redimensionar(g, dx, dy) {
+    const zona = zonaVideo();
+    const altoCromo = altoCromoVideo();
+    const prop = estado.video.proporcion;
+    const derecha = g.caja.x + g.caja.ancho;
+    const abajo = g.caja.y + g.caja.alto;
+    const haciaOeste = g.dir.includes("o");
+    const haciaNorte = g.dir.includes("n");
+    // Ancho que pide cada eje del gesto; en las esquinas gana el mayor.
+    let ancho = 0;
+    if (haciaOeste || g.dir.includes("e")) {
+      ancho = g.caja.ancho + (haciaOeste ? -dx : dx);
+    }
+    if (haciaNorte || g.dir.includes("s")) {
+      const altoMarco = g.caja.alto - altoCromo + (haciaNorte ? -dy : dy);
+      ancho = Math.max(ancho, altoMarco * prop);
+    }
+    // Sin crecer más allá del hueco que queda desde el borde anclado.
+    const huecoAncho = haciaOeste ? derecha : zona.ancho - g.caja.x;
+    const huecoAlto = haciaNorte ? abajo : zona.alto - g.caja.y;
+    const maximo = Math.max(1, Math.min(huecoAncho, (huecoAlto - altoCromo) * prop));
+    ancho = limitar(ancho, Math.min(VIDEO_ANCHO_MINIMO, maximo), maximo);
+    const alto = altoCromo + ancho / prop;
+    return {
+      x: haciaOeste ? derecha - ancho : g.caja.x,
+      y: haciaNorte ? abajo - alto : g.caja.y,
+      lado: ancho / factorAnchoVideo(),
+    };
+  }
+
+  function seguir(e) {
+    if (!gesto) return;
+    const dx = e.clientX - gesto.x0;
+    const dy = e.clientY - gesto.y0;
+    if (!gesto.movido) {
+      // Un clic sin desplazamiento no cuenta: no debe fijar la posición.
+      if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+      gesto.movido = true;
+      escenario.classList.add("arrastrando");
+    }
+    estado.video.geometria = gesto.dir
+      ? redimensionar(gesto, dx, dy)
+      : { x: gesto.caja.x + dx, y: gesto.caja.y + dy, lado: gesto.ladoDeseado };
+    aplicarGeometriaVideo();
+  }
+
+  function terminar() {
+    if (!gesto) return;
+    const g = gesto;
+    gesto = null;
+    escenario.classList.remove("arrastrando");
+    if (g.movido) asentarGeometriaVideo(!g.dir);
+  }
+
+  barra.addEventListener("pointerdown", (e) => {
+    // Los botones de la barra no arrastran (salvo el de agarre, que es para eso).
+    if (e.target.closest("button:not(.ev-agarre)")) return;
+    empezar(e, "");
+  });
+  asas.forEach((asa) => {
+    asa.addEventListener("pointerdown", (e) => empezar(e, asa.dataset.dir));
+  });
+  [barra].concat(asas).forEach((el) => {
+    el.addEventListener("pointermove", seguir);
+    el.addEventListener("pointerup", terminar);
+    el.addEventListener("pointercancel", terminar);
+  });
+
+  // Doble clic en la barra: alterna el modo teatro (como maximizar una ventana).
+  barra.addEventListener("dblclick", (e) => {
+    if (!e.target.closest("button")) alternarTeatro();
+  });
+
+  // Alternativa de teclado al arrastre, en el botón de agarre.
+  $("#btn-video-mover").addEventListener("keydown", (e) => {
+    const flechas = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (e.key === "Home") {
+      e.preventDefault();
+      restablecerGeometriaVideo();
+      return;
+    }
+    const d = flechas[e.key];
+    if (!d) return;
+    e.preventDefault(); // que la flecha no llegue a los atajos globales
+    const g = encajarGeometriaVideo();
+    if (e.shiftKey) {
+      // Mayús + flecha cambia el tamaño: → y ↑ agrandan, ← y ↓ encogen.
+      const signo = e.key === "ArrowRight" || e.key === "ArrowUp" ? 1 : -1;
+      estado.video.geometria = {
+        x: g.x,
+        y: g.y,
+        lado: (g.ancho + signo * VIDEO_PASO_TECLADO) / factorAnchoVideo(),
+      };
+      asentarGeometriaVideo(false);
+    } else {
+      estado.video.geometria = {
+        x: g.x + d[0] * VIDEO_PASO_TECLADO,
+        y: g.y + d[1] * VIDEO_PASO_TECLADO,
+        lado: ladoVideoDeseado(),
+      };
+      asentarGeometriaVideo(true);
+    }
+  });
+
+  // Al cambiar el tamaño de la app, la ventana de vídeo se recoloca dentro.
+  window.addEventListener("resize", aplicarGeometriaVideo);
 }
 
 // Marca la fila activa en la biblioteca sin re-renderizarla entera.
@@ -1267,6 +1640,7 @@ function alternarPlay() {
     return;
   }
   if (audio.paused) {
+    cerrarPreview(); // la pista y la vista previa no deben sonar a la vez
     const p = audio.play();
     if (p && p.catch) p.catch(() => {});
   } else {
@@ -1347,6 +1721,33 @@ function actualizarMediaSession(pista) {
   }
 }
 
+// Salta ``segundos`` adelante (o atrás, si es negativo) en la pista actual.
+function saltar(segundos) {
+  if (!estado.rep.archivo || !audio.duration) return;
+  audio.currentTime = limitar(audio.currentTime + segundos, 0, audio.duration);
+}
+
+const guardarVolumen = debounce(() => {
+  guardarConfig({ volumen: audio.volume });
+}, 400);
+
+// Cambia el volumen por orden del usuario y lo recuerda para la próxima vez.
+function fijarVolumen(v) {
+  audio.muted = false;
+  audio.volume = limitar(v, 0, 1);
+  guardarVolumen();
+}
+
+function alternarSilencio() {
+  if (audio.muted || audio.volume === 0) {
+    audio.muted = false;
+    // Quitar el silencio con el volumen a cero no devolvería el sonido.
+    if (audio.volume === 0) fijarVolumen(0.5);
+  } else {
+    audio.muted = true;
+  }
+}
+
 function iniciarEscenarioVideo() {
   const marco = $("#ev-marco");
   const video = audio; // el <video id="media">
@@ -1354,28 +1755,74 @@ function iniciarEscenarioVideo() {
   $("#btn-mostrar-video").addEventListener("click", () => {
     mostrarEscenarioVideo(estado.rep.lista[estado.rep.indice]);
   });
-  $("#btn-video-ocultar").addEventListener("click", () => ocultarEscenarioVideo(false));
+  $("#btn-video-ocultar").addEventListener("click", () => {
+    ocultarEscenarioVideo(false);
+    // El foco pasa al botón que deshace la acción, en vez de perderse.
+    const mostrar = $("#btn-mostrar-video");
+    if (!mostrar.hidden) mostrar.focus();
+  });
+  $("#btn-video-teatro").addEventListener("click", alternarTeatro);
+  $("#btn-video-pantalla").addEventListener("click", alternarPantallaCompleta);
+  $("#btn-video-play").addEventListener("click", alternarPlay);
+  $("#btn-video-silencio").addEventListener("click", alternarSilencio);
 
-  $("#btn-video-pantalla").addEventListener("click", () => {
-    // Pantalla completa sobre el <video>: en fullscreen el navegador muestra
-    // sus controles nativos (nuestra barra inferior no es visible ahí).
-    const destino = video;
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else if (destino.requestFullscreen) {
-      destino.requestFullscreen().catch(() => {});
-    }
+  $("#ev-velocidad").addEventListener("change", (e) => {
+    estado.video.velocidad = Number(e.currentTarget.value) || 1;
+    video.defaultPlaybackRate = estado.video.velocidad;
+    video.playbackRate = estado.video.velocidad;
   });
 
-  // Clic en el marco = play/pausa (gesto habitual en reproductores de vídeo).
+  // Clic en el vídeo = play/pausa; doble clic = pantalla completa (los dos
+  // clics del doble se anulan entre sí, así que la reproducción no cambia).
   marco.addEventListener("click", (e) => {
     if (e.target === video || e.target === marco) alternarPlay();
   });
-
-  // Controles nativos solo en pantalla completa (fuera, manda nuestra barra).
-  document.addEventListener("fullscreenchange", () => {
-    video.controls = document.fullscreenElement === video;
+  marco.addEventListener("dblclick", (e) => {
+    if (e.target === video || e.target === marco) alternarPantallaCompleta();
   });
+
+  // Al entrar o salir de pantalla completa (también la del reproductor de la
+  // vista previa) la ventana de la app tiene que acompañar: WebView2 solo
+  // agranda el elemento hasta el borde de la ventana (ver escritorio.py).
+  document.addEventListener("fullscreenchange", () => {
+    const api = window.pywebview && window.pywebview.api;
+    if (api && typeof api.pantalla_completa === "function") {
+      const aviso = api.pantalla_completa(Boolean(document.fullscreenElement));
+      if (aviso && aviso.catch) aviso.catch(() => {});
+    }
+    reflejarEscenario();
+    despertarControlesVideo();
+  });
+
+  // Cualquier actividad sobre el escenario enseña los controles.
+  for (const tipo of ["pointermove", "pointerdown", "keydown", "focusin"]) {
+    escenario.addEventListener(tipo, despertarControlesVideo);
+  }
+  video.addEventListener("play", despertarControlesVideo);
+  video.addEventListener("pause", despertarControlesVideo);
+
+  // Rueda de espera mientras falta señal.
+  const espera = $("#ev-espera");
+  video.addEventListener("waiting", () => {
+    espera.hidden = false;
+  });
+  for (const tipo of ["playing", "canplay", "error", "emptied"]) {
+    video.addEventListener(tipo, () => {
+      espera.hidden = true;
+    });
+  }
+
+  video.addEventListener("loadstart", () => avisoVideo(""));
+  video.addEventListener("loadedmetadata", () => {
+    if (estado.rep.tipo !== "video") return;
+    if (video.videoWidth && video.videoHeight) {
+      fijarProporcionVideo(video.videoWidth / video.videoHeight);
+    } else {
+      avisoVideo("Este vídeo no trae una imagen que la app sepa mostrar: solo se oye el audio.");
+    }
+  });
+
+  iniciarVentanaVideo();
 }
 
 function iniciarReproductor() {
@@ -1407,73 +1854,131 @@ function iniciarReproductor() {
     );
   });
 
-  // Estado visual play/pausa + ecualizador.
+  // Estado visual play/pausa + ecualizador. El botón de la barra y el de los
+  // controles del vídeo van a la par.
   function reflejarEstado() {
     const sonando = !audio.paused && estado.rep.archivo;
-    // toggleAttribute, no la propiedad .hidden: los <svg> no son HTMLElement
-    // y la propiedad no les pone el atributo (y por tanto no los oculta).
-    btnPlay.querySelector(".icono-play").toggleAttribute("hidden", Boolean(sonando));
-    btnPlay.querySelector(".icono-pausa").toggleAttribute("hidden", !sonando);
-    btnPlay.setAttribute("aria-label", sonando ? "Pausar" : "Reproducir");
+    for (const btn of [btnPlay, $("#btn-video-play")]) {
+      // toggleAttribute, no la propiedad .hidden: los <svg> no son HTMLElement
+      // y la propiedad no les pone el atributo (y por tanto no los oculta).
+      btn.querySelector(".icono-play").toggleAttribute("hidden", Boolean(sonando));
+      btn.querySelector(".icono-pausa").toggleAttribute("hidden", !sonando);
+      btn.setAttribute("aria-label", sonando ? "Pausar" : "Reproducir");
+    }
+    escenario.classList.toggle("en-pausa", !sonando);
     $("#eq").classList.toggle("activo", Boolean(sonando));
     marcarPistaActiva();
   }
   audio.addEventListener("play", reflejarEstado);
   audio.addEventListener("pause", reflejarEstado);
+  reflejarEstado();
 
   audio.addEventListener("ended", () => siguiente(true));
 
   audio.addEventListener("error", () => {
     if (!estado.rep.archivo) return;
-    avisar("No se pudo cargar el audio de esta pista.", "error");
+    if (estado.rep.tipo === "video") {
+      // El aviso va sobre el propio vídeo (role="alert"): sin toast duplicado.
+      avisoVideo("No se puede reproducir este vídeo: falta el archivo o la app no admite " +
+        "su formato. Puedes abrirlo desde su carpeta con otro reproductor.");
+    } else {
+      avisar("No se pudo cargar el audio de esta pista.", "error");
+    }
   });
 
-  // Seek: mientras se arrastra, el timeupdate no debe pisar el valor.
+  // Posición: dos deslizadores (el de la barra y el de los controles del
+  // vídeo) sobre el mismo medio.
+  const seeks = [seek, $("#ev-seek")];
+
+  function pintarPosicion(segundos) {
+    const duracion = audio.duration || 0;
+    const pct = duracion ? (segundos / duracion) * 100 : 0;
+    for (const s of seeks) {
+      s.value = String(pct);
+      pintarRango(s, pct);
+    }
+    $("#tiempo-actual").textContent = formatearTiempo(segundos);
+    $("#ev-tiempo").textContent = formatearTiempo(segundos) + " / " + formatearTiempo(duracion);
+  }
+
+  // Tramo ya cargado a partir de la posición actual (lo enseña el deslizador
+  // del vídeo, más claro que el resto de la pista).
+  function pintarCargado() {
+    let fin = 0;
+    for (let i = 0; i < audio.buffered.length; i++) {
+      if (audio.buffered.start(i) <= audio.currentTime && audio.currentTime <= audio.buffered.end(i)) {
+        fin = audio.buffered.end(i);
+      }
+    }
+    const pct = audio.duration ? (fin / audio.duration) * 100 : 0;
+    $("#ev-seek").style.setProperty("--buf", pct + "%");
+  }
+
   audio.addEventListener("loadedmetadata", () => {
     $("#tiempo-total").textContent = formatearTiempo(audio.duration);
+    pintarPosicion(audio.currentTime);
   });
+  // Seek: mientras se arrastra, el timeupdate no debe pisar el valor.
   audio.addEventListener("timeupdate", () => {
+    pintarCargado();
     if (estado.rep.arrastrandoSeek || !audio.duration) return;
-    const pct = (audio.currentTime / audio.duration) * 100;
-    seek.value = String(pct);
-    pintarRango(seek, pct);
-    $("#tiempo-actual").textContent = formatearTiempo(audio.currentTime);
+    pintarPosicion(audio.currentTime);
   });
-  seek.addEventListener("pointerdown", () => {
-    estado.rep.arrastrandoSeek = true;
-  });
-  // El flag debe soltarse SIEMPRE al levantar el puntero: si el usuario suelta
-  // sin cambiar el valor, 'change' no dispara y la barra quedaría congelada.
-  seek.addEventListener("pointerup", () => {
-    estado.rep.arrastrandoSeek = false;
-  });
-  seek.addEventListener("pointercancel", () => {
-    estado.rep.arrastrandoSeek = false;
-  });
-  seek.addEventListener("input", () => {
-    pintarRango(seek, Number(seek.value));
-    if (audio.duration) {
-      $("#tiempo-actual").textContent =
-        formatearTiempo((Number(seek.value) / 100) * audio.duration);
-    }
-  });
-  seek.addEventListener("change", () => {
-    estado.rep.arrastrandoSeek = false;
-    if (audio.duration) {
-      audio.currentTime = (Number(seek.value) / 100) * audio.duration;
-    }
+  audio.addEventListener("progress", pintarCargado);
+  // Al cambiar de pista no debe quedar a la vista el tiempo de la anterior.
+  audio.addEventListener("emptied", () => {
+    $("#tiempo-total").textContent = formatearTiempo(0);
+    pintarPosicion(0);
+    pintarCargado();
   });
 
-  // Volumen (persistido en localStorage).
-  const volGuardado = parseFloat(localStorage.getItem("sonora-volumen"));
-  audio.volume = isFinite(volGuardado) ? Math.min(1, Math.max(0, volGuardado)) : 1;
-  volumen.value = String(audio.volume);
-  pintarRango(volumen, audio.volume * 100);
-  volumen.addEventListener("input", () => {
-    audio.volume = Number(volumen.value);
-    pintarRango(volumen, audio.volume * 100);
-    localStorage.setItem("sonora-volumen", String(audio.volume));
-  });
+  for (const s of seeks) {
+    s.addEventListener("pointerdown", () => {
+      estado.rep.arrastrandoSeek = true;
+    });
+    // El flag debe soltarse SIEMPRE al levantar el puntero: si el usuario suelta
+    // sin cambiar el valor, 'change' no dispara y la barra quedaría congelada.
+    s.addEventListener("pointerup", () => {
+      estado.rep.arrastrandoSeek = false;
+    });
+    s.addEventListener("pointercancel", () => {
+      estado.rep.arrastrandoSeek = false;
+    });
+    s.addEventListener("input", () => {
+      if (audio.duration) {
+        pintarPosicion((Number(s.value) / 100) * audio.duration);
+      } else {
+        pintarRango(s, Number(s.value));
+      }
+    });
+    s.addEventListener("change", () => {
+      estado.rep.arrastrandoSeek = false;
+      if (audio.duration) {
+        audio.currentTime = (Number(s.value) / 100) * audio.duration;
+      }
+    });
+  }
+
+  // Volumen: dos deslizadores y el botón de silencio, todos reflejo del propio
+  // medio. El valor inicial llega con la configuración (cargarConfig).
+  const volumenes = [volumen, $("#ev-volumen")];
+
+  function reflejarVolumen() {
+    const v = audio.muted ? 0 : audio.volume;
+    for (const s of volumenes) {
+      s.value = String(v);
+      pintarRango(s, v * 100);
+    }
+    const btnSilencio = $("#btn-video-silencio");
+    btnSilencio.setAttribute("aria-pressed", String(audio.muted));
+    btnSilencio.querySelector(".icono-sonido").toggleAttribute("hidden", v === 0);
+    btnSilencio.querySelector(".icono-silencio").toggleAttribute("hidden", v !== 0);
+  }
+  audio.addEventListener("volumechange", reflejarVolumen);
+  for (const s of volumenes) {
+    s.addEventListener("input", () => fijarVolumen(Number(s.value)));
+  }
+  reflejarVolumen();
 
   $("#btn-abrir-carpeta").addEventListener("click", () => {
     if (estado.rep.archivo) abrirCarpetaDe(estado.rep.archivo);
@@ -1486,13 +1991,70 @@ function iniciarReproductor() {
       navigator.mediaSession.setActionHandler("pause", alternarPlay);
       navigator.mediaSession.setActionHandler("previoustrack", anterior);
       navigator.mediaSession.setActionHandler("nexttrack", () => siguiente(false));
+      navigator.mediaSession.setActionHandler("seekbackward", () => saltar(-10));
+      navigator.mediaSession.setActionHandler("seekforward", () => saltar(10));
     } catch (e) {
       /* algún handler no soportado: seguimos sin él */
     }
   }
 
-  // Atajos de teclado: espacio = play/pausa, "/" = ir al buscador.
+  // Atajos del reproductor. Devuelve true si la tecla se ha usado.
+  function atajoReproductor(e) {
+    const hayVideo = !escenario.hidden;
+    const completa = enPantallaCompleta();
+    const teatro = estado.video.modo === "teatro";
+    // Los de la ventana de vídeo valen también para la vista previa.
+    if (hayVideo) {
+      switch (e.key) {
+        case "f": case "F": alternarPantallaCompleta(); return true;
+        case "t": case "T":
+          if (completa) return false;
+          alternarTeatro();
+          return true;
+        case "Escape":
+          // Escape deshace un paso: de teatro a ventana y, ya en ventana,
+          // cierra la vista previa (de pantalla completa saca el navegador).
+          if (completa) return false;
+          if (teatro) {
+            fijarModoVideo("flotante");
+            return true;
+          }
+          if (estado.video.previa) {
+            cerrarPreview();
+            return true;
+          }
+          return false;
+        default: break;
+      }
+    }
+    // Los de la pista. Con la vista previa abierta lo que suena es YouTube,
+    // que tiene sus propios atajos dentro de su reproductor.
+    if (!estado.rep.archivo || estado.video.previa) return false;
+    // ↑/↓ mueven el volumen solo cuando el vídeo tiene el protagonismo; en el
+    // resto de la app esas teclas desplazan las listas.
+    const videoAlFrente = hayVideo &&
+      (teatro || completa || escenario.contains(document.activeElement));
+    switch (e.key) {
+      case "ArrowLeft": saltar(-5); return true;
+      case "ArrowRight": saltar(5); return true;
+      case "ArrowUp":
+        if (!videoAlFrente) return false;
+        fijarVolumen(audio.volume + 0.05);
+        return true;
+      case "ArrowDown":
+        if (!videoAlFrente) return false;
+        fijarVolumen(audio.volume - 0.05);
+        return true;
+      case "m": case "M": alternarSilencio(); return true;
+      default: return false;
+    }
+  }
+
+  // Atajos de teclado: espacio = play/pausa, "/" = ir al buscador, y los del
+  // reproductor (saltos, volumen, silencio, teatro y pantalla completa).
   document.addEventListener("keydown", (e) => {
+    // Quien ya ha usado la tecla (p. ej. el botón de agarre del vídeo) manda.
+    if (e.defaultPrevented) return;
     const tag = (e.target && e.target.tagName) || "";
     const escribiendo = tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
     const dialogoAbierto = Boolean(document.querySelector("dialog[open]"));
@@ -1500,14 +2062,19 @@ function iniciarReproductor() {
     // ya use Espacio para activarse (botones, summary de los lotes, enlaces).
     const enControl = e.target && e.target.closest &&
       e.target.closest("button, summary, a, input, select, textarea");
-    if (e.key === " " && !enControl && !dialogoAbierto) {
+    if (e.key === " " && !enControl && !dialogoAbierto && !estado.video.previa) {
       e.preventDefault();
       alternarPlay();
     }
-    if (e.key === "/" && !escribiendo && !dialogoAbierto) {
+    if (e.key === "/" && !escribiendo && !dialogoAbierto && !enPantallaCompleta()) {
       e.preventDefault();
       cambiarVista("buscar");
       $("#campo-buscar").focus();
+    }
+    if (escribiendo || dialogoAbierto || e.ctrlKey || e.altKey || e.metaKey) return;
+    if (atajoReproductor(e)) {
+      e.preventDefault();
+      despertarControlesVideo();
     }
   });
 }
@@ -1633,6 +2200,10 @@ function iniciarDialogoCarpetas() {
 // nuestra cuenta: las URLs de stream van firmadas y caducan, así que un
 // <audio> apuntando a ellas se rompería solo. El dominio -nocookie evita que
 // YouTube plante cookies de seguimiento por el hecho de abrir la ventana.
+//
+// Se ve en la misma ventana flotante que los vídeos de la biblioteca (el
+// escenario): se mueve, se redimensiona y pasa a teatro o a pantalla completa
+// igual, y como no es modal se puede seguir buscando mientras suena.
 // ---------------------------------------------------------------------------
 
 // Campos que la tarjeta lleva en sus data-* y que necesita agregarUno().
@@ -1642,7 +2213,16 @@ function abrirPreview(btn) {
   const id = btn.dataset.previewId;
   if (!id) return;
 
-  $("#preview-titulo").textContent = btn.dataset.titulo || "Vista previa";
+  // La biblioteca calla mientras se escucha la vista previa y, si había un
+  // vídeo a la vista, cede la ventana (queda su botón para recuperarlo).
+  if (estado.rep.videoVisible) {
+    ocultarEscenarioVideo(true);
+  } else {
+    audio.pause();
+  }
+
+  estado.video.previa = { id: id, origen: btn };
+  $("#ev-titulo").textContent = btn.dataset.titulo || "Vista previa";
   $("#preview-canal").textContent = btn.dataset.canal || "";
 
   const iframe = document.createElement("iframe");
@@ -1651,12 +2231,12 @@ function abrirPreview(btn) {
   iframe.title = "Reproductor de " + (btn.dataset.titulo || "YouTube");
   iframe.allow = "autoplay; encrypted-media; picture-in-picture";
   iframe.allowFullscreen = true;
-  const marco = $("#preview-marco");
+  const marco = $("#ev-previa");
   marco.innerHTML = "";
   marco.appendChild(iframe);
 
-  // El botón del diálogo se prepara como si fuera el ＋ de la tarjeta, así
-  // añadir desde aquí pasa por el mismo agregarUno() y hereda su manejo de
+  // El botón del pie se prepara como si fuera el ＋ de la tarjeta, así añadir
+  // desde aquí pasa por el mismo agregarUno() y hereda su manejo de
   // duplicados, formato y avisos.
   const btnAnadir = $("#btn-preview-descargar");
   for (const campo of CAMPOS_ITEM) btnAnadir.dataset[campo] = btn.dataset[campo] || "";
@@ -1664,32 +2244,37 @@ function abrirPreview(btn) {
   btnAnadir.disabled = yaEsta;
   btnAnadir.textContent = yaEsta ? "✓ Ya está en la cola" : "＋ Añadir a la cola";
 
-  $("#dialogo-preview").showModal();
+  escenario.hidden = false;
+  fijarProporcionVideo(16 / 9); // el reproductor de YouTube es siempre apaisado
+  reflejarEscenario();
+  despertarControlesVideo();
+  // El foco entra en la ventana para poder manejarla (y cerrarla) con teclado.
+  $("#btn-preview-cerrar").focus();
 }
 
+// Cierra la vista previa, si la hay.
 function cerrarPreview() {
-  const dlg = $("#dialogo-preview");
-  if (dlg.open) dlg.close();  // el resto lo hace el manejador de 'close'
+  const previa = estado.video.previa;
+  if (!previa) return;
+  if (document.fullscreenElement) document.exitFullscreen();
+  const teniaElFoco = escenario.contains(document.activeElement);
+  estado.video.previa = null;
+  // Vaciar el marco destruye el iframe y corta el sonido.
+  $("#ev-previa").innerHTML = "";
+  escenario.hidden = true;
+  reflejarEscenario();
+  // El foco vuelve a la tarjeta desde la que se abrió, si sigue en pantalla.
+  if (teniaElFoco && previa.origen.isConnected) previa.origen.focus();
 }
 
 function iniciarPreview() {
-  const dlg = $("#dialogo-preview");
   $("#btn-preview-cerrar").addEventListener("click", cerrarPreview);
-  // 'close' cubre todas las vías de cierre, incluido el Escape que el propio
-  // <dialog> gestiona: vaciar el marco destruye el iframe y corta el sonido.
-  dlg.addEventListener("close", () => {
-    $("#preview-marco").innerHTML = "";
-  });
-  // Clic en el fondo: el backdrop pertenece al <dialog>, de modo que el
-  // objetivo del evento es el diálogo mismo y no su contenido.
-  dlg.addEventListener("click", (e) => {
-    if (e.target === dlg) cerrarPreview();
-  });
   $("#btn-preview-descargar").addEventListener("click", async (e) => {
     const boton = e.currentTarget;
     if (!boton.dataset.url) return;
     await agregarUno(boton);
-    cerrarPreview();
+    // La ventana no es modal: se puede seguir escuchando tras añadir.
+    if (boton.disabled) boton.textContent = "✓ Ya está en la cola";
   });
 }
 

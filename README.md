@@ -63,6 +63,10 @@ Guía detallada en [docs/instalacion.md](docs/instalacion.md).
 - ▶️ **Reproductor**: play/pausa, anterior/siguiente, **aleatorio**,
   **repetir (lista/pista)**, barra de progreso, volumen persistente, teclas
   multimedia del sistema y atajos (espacio = play/pausa, `/` = buscar).
+- 🎬 **Vídeo**: los MP4 de la biblioteca y la vista previa del buscador se ven
+  en una ventana flotante que se mueve y se redimensiona a mano, en modo teatro
+  o a pantalla completa; los de la biblioteca, con controles propios (posición,
+  volumen y velocidad).
 - 🕑 **Historial** de descargas completadas.
 - ♿ **Accesible**: navegación por teclado completa, foco visible, lectores de
   pantalla (live regions), contraste AA y respeto de `prefers-reduced-motion`.

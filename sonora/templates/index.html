@@ -255,46 +255,95 @@
     </footer>
 
     <!-- ===============================================================
-         Escenario de vídeo (mini-teatro flotante). El <video> es el ÚNICO
-         elemento multimedia: reproduce también el audio (MP3), pero entonces
-         el escenario permanece oculto. Vive fijo aquí para no re-parentar un
-         medio en reproducción (evita recargas/parpadeos).
+         Escenario de vídeo. Se ve de tres maneras: ventana flotante (se
+         arrastra por su barra y se redimensiona por los bordes), modo teatro
+         (ocupa la zona de contenido) y pantalla completa. El <video> es el
+         ÚNICO elemento multimedia: reproduce también el audio (MP3), pero
+         entonces el escenario permanece oculto. Vive siempre aquí para no
+         re-parentar un medio en reproducción (evita recargas/parpadeos).
+         La misma ventana enseña la vista previa de los resultados del
+         buscador (el reproductor de YouTube), con su pie para añadir a la
+         cola: nunca se ven las dos cosas a la vez.
          =============================================================== -->
     <section class="escenario-video" id="escenario-video" aria-label="Reproductor de vídeo" hidden>
-        <div class="ev-barra">
+        <div class="ev-barra" id="ev-barra">
+            <!-- Alternativa de teclado al arrastre: flechas para mover,
+                 Mayús + flechas para el tamaño, Inicio para restablecer. -->
+            <button type="button" class="btn-icono ev-agarre" id="btn-video-mover"
+                    aria-label="Mover la ventana de vídeo: flechas para moverla, Mayúsculas más flechas para cambiar su tamaño, Inicio para devolverla a su sitio"
+                    title="Arrastra para mover · Flechas: mover · Mayús + flechas: tamaño · Inicio: restablecer">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.6" fill="currentColor"/><circle cx="15" cy="6" r="1.6" fill="currentColor"/><circle cx="9" cy="12" r="1.6" fill="currentColor"/><circle cx="15" cy="12" r="1.6" fill="currentColor"/><circle cx="9" cy="18" r="1.6" fill="currentColor"/><circle cx="15" cy="18" r="1.6" fill="currentColor"/></svg>
+            </button>
             <p class="ev-titulo" id="ev-titulo"></p>
-            <button type="button" class="btn-icono" id="btn-video-pantalla" aria-label="Pantalla completa" title="Pantalla completa">
-                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <button type="button" class="btn-icono" id="btn-video-teatro" aria-label="Modo teatro" aria-pressed="false" title="Modo teatro (T)">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            </button>
+            <button type="button" class="btn-icono" id="btn-video-pantalla" aria-label="Pantalla completa" aria-pressed="false" title="Pantalla completa (F)">
+                <svg aria-hidden="true" viewBox="0 0 24 24" class="icono-entrar"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg aria-hidden="true" viewBox="0 0 24 24" class="icono-salir" hidden><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
             <button type="button" class="btn-icono" id="btn-video-ocultar" aria-label="Ocultar el vídeo (seguir escuchando)" title="Ocultar el vídeo">
                 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
+            <button type="button" class="btn-icono" id="btn-preview-cerrar" aria-label="Cerrar la vista previa" title="Cerrar la vista previa (Esc)" hidden>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
         </div>
         <div class="ev-marco" id="ev-marco">
             <video id="media" preload="metadata" playsinline></video>
+            <div class="ev-espera" id="ev-espera" hidden></div>
+            <p class="ev-aviso" id="ev-aviso" role="alert" hidden></p>
+            <!-- Controles propios sobre el vídeo: se esconden solos al reproducir. -->
+            <div class="ev-controles" id="ev-controles">
+                <input type="range" class="ev-seek" id="ev-seek" min="0" max="100" step="0.1" value="0"
+                       aria-label="Posición del vídeo">
+                <div class="ev-fila">
+                    <button type="button" class="btn-icono" id="btn-video-play" aria-label="Reproducir">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" class="icono-play"><path d="M8 5.5v13l11-6.5-11-6.5z" fill="currentColor"/></svg>
+                        <svg aria-hidden="true" viewBox="0 0 24 24" class="icono-pausa" hidden><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg>
+                    </button>
+                    <span class="ev-tiempo" id="ev-tiempo">0:00 / 0:00</span>
+                    <span class="ev-hueco"></span>
+                    <button type="button" class="btn-icono" id="btn-video-silencio" aria-label="Silenciar" aria-pressed="false" title="Silenciar (M)">
+                        <svg aria-hidden="true" viewBox="0 0 24 24" class="icono-sonido"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        <svg aria-hidden="true" viewBox="0 0 24 24" class="icono-silencio" hidden><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="m16 9.5 5 5m0-5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    </button>
+                    <input type="range" class="ev-volumen" id="ev-volumen" min="0" max="1" step="0.01" value="1" aria-label="Volumen">
+                    <label class="visualmente-oculto" for="ev-velocidad">Velocidad de reproducción</label>
+                    <select class="ev-velocidad" id="ev-velocidad" title="Velocidad de reproducción">
+                        <option value="0.5">0.5×</option>
+                        <option value="0.75">0.75×</option>
+                        <option value="1" selected>1×</option>
+                        <option value="1.25">1.25×</option>
+                        <option value="1.5">1.5×</option>
+                        <option value="2">2×</option>
+                    </select>
+                </div>
+            </div>
+            <!-- Vista previa de un resultado del buscador: el reproductor
+                 incrustado de YouTube. El iframe se crea al abrir y se
+                 destruye al cerrar; si se dejara en el DOM, el vídeo seguiría
+                 sonando con la ventana cerrada. -->
+            <div class="ev-previa" id="ev-previa" hidden></div>
         </div>
+        <footer class="ev-pie" id="ev-pie" hidden>
+            <p class="ev-canal" id="preview-canal"></p>
+            <button type="button" class="btn btn-ambar" id="btn-preview-descargar">＋ Añadir a la cola</button>
+        </footer>
+        <!-- Asas de redimensionado (solo puntero; con teclado, el botón de agarre). -->
+        <span class="ev-asa" data-dir="n" aria-hidden="true"></span>
+        <span class="ev-asa" data-dir="e" aria-hidden="true"></span>
+        <span class="ev-asa" data-dir="s" aria-hidden="true"></span>
+        <span class="ev-asa" data-dir="o" aria-hidden="true"></span>
+        <span class="ev-asa" data-dir="ne" aria-hidden="true"></span>
+        <span class="ev-asa" data-dir="se" aria-hidden="true"></span>
+        <span class="ev-asa" data-dir="so" aria-hidden="true"></span>
+        <span class="ev-asa" data-dir="no" aria-hidden="true"></span>
     </section>
 
     <!-- ===============================================================
          Diálogo modal: explorador de carpetas de destino
          =============================================================== -->
-    <!-- Escucha antes de descargar: el reproductor incrustado de YouTube.
-         El iframe se crea al abrir y se destruye al cerrar; si se dejara en el
-         DOM, el vídeo seguiría sonando con el diálogo cerrado. -->
-    <dialog id="dialogo-preview" class="dialogo-preview" aria-labelledby="preview-titulo">
-        <header class="preview-cabecera">
-            <h2 id="preview-titulo">Vista previa</h2>
-            <button type="button" class="btn-icono" id="btn-preview-cerrar" aria-label="Cerrar la vista previa">
-                <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            </button>
-        </header>
-        <div class="preview-marco" id="preview-marco"></div>
-        <footer class="preview-pie">
-            <p class="preview-canal" id="preview-canal"></p>
-            <button type="button" class="btn btn-ambar" id="btn-preview-descargar">＋ Añadir a la cola</button>
-        </footer>
-    </dialog>
-
     <dialog id="dialogo-carpetas" aria-labelledby="dlg-titulo">
         <h2 id="dlg-titulo">Elegir carpeta de destino</h2>
         <p class="dlg-ruta">

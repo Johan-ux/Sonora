@@ -244,6 +244,57 @@ class TestConfig:
         datos = client.get("/api/config").get_json()
         assert datos["bitrate_por_defecto"] == "320"
 
+    def test_reproductor_valores_por_defecto(self, client):
+        datos = client.get("/api/config").get_json()
+        assert datos["volumen"] == 1.0
+        assert datos["video_modo"] == "flotante"
+        assert datos["video_geometria"] is None
+
+    def test_reproductor_se_recuerda(self, client):
+        client.post(
+            "/api/config",
+            json={
+                "volumen": 0.35,
+                "video_modo": "teatro",
+                "video_geometria": {"x": 40.4, "y": 12, "lado": 640.6},
+            },
+        )
+        datos = client.get("/api/config").get_json()
+        assert datos["volumen"] == 0.35
+        assert datos["video_modo"] == "teatro"
+        # Se guarda en píxeles enteros.
+        assert datos["video_geometria"] == {"x": 40, "y": 12, "lado": 641}
+
+    @pytest.mark.parametrize(
+        ("enviado", "guardado"),
+        [(7, 1.0), (-3, 0.0), ("0.5", 0.5), ("alto", 1.0), (None, 1.0), (True, 1.0)],
+    )
+    def test_volumen_se_acota_entre_0_y_1(self, client, enviado, guardado):
+        client.post("/api/config", json={"volumen": enviado})
+        assert client.get("/api/config").get_json()["volumen"] == guardado
+
+    def test_modo_de_video_invalido_cae_a_flotante(self, client):
+        client.post("/api/config", json={"video_modo": "teatro"})
+        client.post("/api/config", json={"video_modo": "cine"})
+        assert client.get("/api/config").get_json()["video_modo"] == "flotante"
+
+    @pytest.mark.parametrize(
+        "geometria",
+        [
+            None,
+            "aquí",
+            [1, 2, 3],
+            {"x": 1, "y": 2},
+            {"x": "a", "y": 2, "lado": 300},
+            {"x": 1, "y": 2, "lado": 0},
+            {"x": 1, "y": True, "lado": 300},
+        ],
+    )
+    def test_geometria_invalida_restablece_la_ventana(self, client, geometria):
+        client.post("/api/config", json={"video_geometria": {"x": 1, "y": 2, "lado": 300}})
+        client.post("/api/config", json={"video_geometria": geometria})
+        assert client.get("/api/config").get_json()["video_geometria"] is None
+
 
 # --------------------------------------------------------------------------- #
 # /api/carpetas
