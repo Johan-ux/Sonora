@@ -214,6 +214,43 @@ def cola_agregar_si_no_activa(item: dict) -> bool:
         return True
 
 
+def cola_agregar_varios_si_no_activas(items: list[dict]) -> list[str]:
+    """Inserta de una vez los ítems cuya URL no esté ya pendiente o bajando.
+
+    Es ``cola_agregar_si_no_activa`` para una playlist entera: una sola
+    transacción en lugar de un ``commit`` (una escritura a disco) por canción.
+    Devuelve los ids insertados; el resto se omitió por estar ya en la cola o
+    por repetirse dentro de la propia lista.
+    """
+    insertados: list[str] = []
+    with _lock:
+        conexion = _obtener_conexion()
+        activas = {
+            fila["url"] for fila in conexion.execute(
+                "SELECT url FROM cola WHERE estado IN ('en_cola', 'descargando')"
+            )
+        }
+        for item in items:
+            if item["url"] in activas:
+                continue
+            try:
+                _insertar_item(conexion, item)
+            except sqlite3.Error:
+                continue  # un ítem inválido no aborta el resto
+            activas.add(item["url"])
+            insertados.append(item["id"])
+        conexion.commit()
+    return insertados
+
+
+def cola_obtener(item_id: str) -> dict | None:
+    """Devuelve el ítem de la cola con ese id, o None si no existe."""
+    with _lock:
+        conexion = _obtener_conexion()
+        fila = conexion.execute("SELECT * FROM cola WHERE id = ?", (item_id,)).fetchone()
+    return _fila_a_dict(fila)
+
+
 def cola_eliminar(item_id: str) -> bool:
     """Borra un ítem de la cola solo si su estado es 'en_cola'.
 
@@ -308,28 +345,51 @@ def cola_reclamar(item_id: str) -> bool:
         return cursor.rowcount > 0
 
 
+# Reactiva un ítem en error SOLO si su URL no está ya pendiente o bajando en
+# otra fila. Sin esa condición, reintentar una canción que el usuario ya volvió
+# a añadir dejaría dos ítems activos con la misma URL, y dos workers
+# escribiendo el mismo fichero a la vez.
+_SQL_REINTENTAR = (
+    "UPDATE cola SET estado = 'en_cola', error = '' "
+    "WHERE id = ? AND estado = 'error' AND NOT EXISTS ("
+    "    SELECT 1 FROM cola AS otra"
+    "    WHERE otra.url = cola.url AND otra.id <> cola.id"
+    "      AND otra.estado IN ('en_cola', 'descargando')"
+    ")"
+)
+
+
 def cola_reintentar(item_id: str) -> bool:
-    """Devuelve un ítem 'error' a 'en_cola' para reintentarlo."""
+    """Devuelve un ítem 'error' a 'en_cola' para reintentarlo.
+
+    Devuelve False si no estaba en error o si su URL ya está activa en otro
+    ítem (se quedaría duplicada).
+    """
     with _lock:
         conexion = _obtener_conexion()
-        cursor = conexion.execute(
-            "UPDATE cola SET estado = 'en_cola', error = '' "
-            "WHERE id = ? AND estado = 'error'",
-            (item_id,),
-        )
+        cursor = conexion.execute(_SQL_REINTENTAR, (item_id,))
         conexion.commit()
         return cursor.rowcount > 0
 
 
 def cola_reintentar_errores() -> int:
-    """Devuelve TODOS los ítems 'error' a 'en_cola'. Devuelve cuántos."""
+    """Devuelve a 'en_cola' los ítems 'error'. Devuelve cuántos.
+
+    Va de uno en uno, en orden: si dos ítems en error comparten URL, el primero
+    se reactiva y el segundo, que ya la encuentra activa, se queda como está.
+    """
     with _lock:
         conexion = _obtener_conexion()
-        cursor = conexion.execute(
-            "UPDATE cola SET estado = 'en_cola', error = '' WHERE estado = 'error'"
-        )
+        ids = [
+            fila["id"] for fila in conexion.execute(
+                "SELECT id FROM cola WHERE estado = 'error' ORDER BY posicion ASC"
+            )
+        ]
+        reactivados = 0
+        for item_id in ids:
+            reactivados += conexion.execute(_SQL_REINTENTAR, (item_id,)).rowcount
         conexion.commit()
-        return cursor.rowcount
+        return reactivados
 
 
 def cola_urls_activas() -> set[str]:

@@ -6,6 +6,10 @@ fallos pasajeros se reintentan solos, y los definitivos (vídeo privado,
 bloqueado por región…) se dan por perdidos sin gastar intentos. Una descarga
 interrumpida se lleva por delante sus propios ficheros a medias.
 
+yt-dlp no trabaja en la carpeta de música sino en una temporal por ítem, y
+solo al terminar mueve allí el resultado: la biblioteca nunca ve un fichero a
+medio hacer.
+
 El progreso de cada ítem en curso se mantiene en memoria (``PROGRESO_ACTIVO``)
 y se difunde por SSE; la cola persistente vive en ``db``. Las opciones de
 yt-dlp (mejor audio, extracción a MP3 con bitrate fijo, metadatos y carátula)
@@ -14,7 +18,7 @@ se comparten con la CLI a través de ``sonora.ydl_opts``.
 
 from __future__ import annotations
 
-import glob
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -26,6 +30,7 @@ from .. import db, ffmpeg, sse
 from ..paths import CARPETA_DESCARGAS, rel_descargas, resolver_dentro_descargas
 from ..utils import ahora_iso, colapsar_error
 from ..ydl_opts import (
+    PLANTILLA_SALIDA,
     normalizar_bitrate,
     normalizar_formato,
     normalizar_resolucion,
@@ -85,6 +90,10 @@ ERRORES_PERMANENTES = (
     # último lo rechaza _rechazar_directos con MENSAJE_DIRECTO).
     "live event will begin",
     "emisión en directo",
+    # Sin ffmpeg no hay conversión ni fusión que valga, se intente las veces
+    # que se intente.
+    "ffmpeg not found",
+    "ffmpeg is not installed",
 )
 
 # Texto con el que se rechaza un directo en curso.
@@ -111,53 +120,58 @@ def _es_error_permanente(mensaje: str) -> bool:
     return any(fragmento in texto for fragmento in ERRORES_PERMANENTES)
 
 
-# Sufijos de los ficheros a medias que deja yt-dlp. La descarga en curso va a
-# '<destino>.part' (y '.part-FragN' si el formato viene fragmentado); '.ytdl'
-# guarda el estado para poder reanudar. Solo se borra lo que acabe así: el
-# resultado final nunca lleva estos sufijos.
-SUFIJOS_TEMPORALES = (".part", ".ytdl", ".temp")
+# Carpeta de trabajo de las descargas en curso, hermana de la de música.
+NOMBRE_TEMPORAL = "temporal"
 
 
-def _es_temporal(nombre: str) -> bool:
-    """Indica si ``nombre`` es un fichero intermedio de yt-dlp."""
-    if nombre.endswith(SUFIJOS_TEMPORALES):
-        return True
-    # Fragmentos: 'video.mp4.part-Frag12'.
-    return ".part-Frag" in nombre
+def _raiz_temporal() -> Path:
+    """Carpeta donde yt-dlp trabaja mientras baja y convierte.
 
-
-def _limpiar_temporales(rutas) -> int:
-    """Borra los ficheros a medias de una descarga interrumpida.
-
-    Sin esto, cancelar deja el '.part' en disco para siempre: nadie vuelve a
-    mirarlo y con el tiempo son megas invisibles en la carpeta de música.
-
-    Dos salvaguardas, porque esto borra ficheros del usuario: solo se toca lo
-    que esté DENTRO de la carpeta de descargas y solo lo que lleve sufijo de
-    temporal. Un fichero de música terminado no cumple ninguna de las dos.
+    Va JUNTO a la de descargas y no dentro. Lo que hay a medias —el '.part',
+    la pista de vídeo esperando a su audio, el original antes de pasar a MP3,
+    la miniatura— tiene extensiones de música de verdad ('.f399.mp4',
+    '.temp.mp4', '.m4a'): dentro, la biblioteca lo enseñaría como una pista
+    más y, si la descarga se cancela, se quedaría allí para siempre. Al estar
+    en el mismo disco, mover el resultado a su sitio es instantáneo.
     """
-    borrados = 0
-    for ruta in rutas:
-        base = Path(ruta)
-        # Los corchetes de la plantilla ('Titulo [id].mp3') son comodines para
-        # glob; sin escaparlos, el patrón no encontraría nada.
-        patron = glob.escape(base.name) + "*"
-        try:
-            candidatos = list(base.parent.glob(patron))
-        except OSError:
-            continue
-        for candidato in candidatos:
-            if not _es_temporal(candidato.name):
-                continue
-            # rel_descargas devuelve '' —no None— para lo que cae fuera.
-            if not rel_descargas(candidato):
-                continue  # fuera de descargas/: no es nuestro
-            try:
-                candidato.unlink()
-                borrados += 1
-            except OSError:
-                pass  # otro proceso lo tiene abierto; se quedará ahí
-    return borrados
+    return CARPETA_DESCARGAS.parent / NOMBRE_TEMPORAL
+
+
+def _carpeta_temporal(item_id: str) -> Path:
+    """Carpeta de trabajo de un ítem (los ids los genera la app: son seguros)."""
+    return _raiz_temporal() / item_id
+
+
+def _borrar_temporal(carpeta: Path) -> None:
+    """Borra la carpeta de trabajo de un ítem con todo lo que contenga.
+
+    Si otro proceso aún tiene abierto algún fichero (ffmpeg recién
+    interrumpido), se queda; lo recoge el barrido del siguiente arranque.
+    """
+    shutil.rmtree(carpeta, ignore_errors=True)
+
+
+def limpiar_temporales_huerfanos() -> int:
+    """Borra, al arrancar, las carpetas de trabajo que ya no son de nadie.
+
+    Se conservan las de los ítems que siguen pendientes: una descarga cortada
+    por un cierre inesperado vuelve a la cola y, con su '.part' intacto,
+    continúa por donde iba en vez de empezar de cero. Devuelve cuántas borró.
+    """
+    try:
+        carpetas = [c for c in _raiz_temporal().iterdir() if c.is_dir()]
+    except OSError:
+        return 0
+    pendientes = {
+        item["id"] for item in db.cola_listar()
+        if item.get("estado") in ("en_cola", "descargando")
+    }
+    borradas = 0
+    for carpeta in carpetas:
+        if carpeta.name not in pendientes:
+            _borrar_temporal(carpeta)
+            borradas += 1
+    return borradas
 
 
 def _esperar_cancelable(segundos: float, item_id: str) -> None:
@@ -198,6 +212,24 @@ def listar_cola_con_progreso() -> list[dict]:
 def emitir_cola_actualizada() -> None:
     """Emite el evento ``cola_actualizada`` con la cola actual (progreso vivo)."""
     sse.emitir({"tipo": "cola_actualizada", "items": listar_cola_con_progreso()})
+
+
+def emitir_item_actualizado(item_id: str) -> None:
+    """Emite el estado de UN ítem (evento ``item_actualizado``).
+
+    Para los cambios que solo tocan una fila: empieza a bajar, termina, falla.
+    Mandar la cola entera en cada uno hace que una playlist de mil canciones
+    se serialice y se repinte entera dos mil veces. Si el ítem ya no existe,
+    se manda la cola completa para que la interfaz se ponga al día.
+    """
+    item = db.cola_obtener(item_id)
+    if item is None:
+        emitir_cola_actualizada()
+        return
+    with _LOCK_PROGRESO:
+        vivo = PROGRESO_ACTIVO.get(item_id)
+    item["progreso"] = float(vivo) if vivo is not None else 0.0
+    sse.emitir({"tipo": "item_actualizado", "item": item})
 
 
 def bitrate_por_defecto() -> str:
@@ -265,17 +297,25 @@ def _cancelacion_pedida(item_id: str) -> bool:
         return item_id in _CANCELACIONES
 
 
+def hay_descargas_en_curso() -> bool:
+    """Indica si algún ítem se está descargando o convirtiendo ahora mismo."""
+    with _LOCK_PROGRESO:
+        return bool(PROGRESO_ACTIVO)
+
+
 # --------------------------------------------------------------------------- #
 # Opciones de yt-dlp y resolución del fichero resultante
 # --------------------------------------------------------------------------- #
 
 def _construir_opciones_descarga(
-    carpeta_rel: str, formato: str, bitrate: str, resolucion: str, hook, pp_hook
+    carpeta_rel: str, formato: str, bitrate: str, resolucion: str, hook, pp_hook,
+    temporal: Path,
 ) -> dict:
     """Opciones de yt-dlp para descargar un ítem (base compartida + app).
 
     Según ``formato`` construye la base de audio (MP3) o de vídeo (MP4) y le
     añade las opciones propias de la app (blindaje anti-colección, hooks…).
+    ``temporal`` es la carpeta de trabajo del ítem (ver ``_raiz_temporal``).
     """
     destino = CARPETA_DESCARGAS
     carpeta_rel = (carpeta_rel or "").strip().replace("\\", "/").strip("/")
@@ -289,6 +329,11 @@ def _construir_opciones_descarga(
     else:
         opciones = opciones_mp3(destino, bitrate)
     opciones.update({
+        # yt-dlp baja y convierte en 'temp' y solo al acabar mueve el
+        # resultado a 'home'. La plantilla va sin carpeta: con una ruta
+        # absoluta, 'paths' se ignora.
+        "outtmpl": PLANTILLA_SALIDA,
+        "paths": {"home": str(destino), "temp": str(temporal)},
         # Blindaje: un ítem de la cola es SIEMPRE una sola canción. 'noplaylist'
         # (de la base) cubre watch?v=X&list=Y (baja solo X); si por lo que sea
         # la URL fuese un canal/playlist a secas, 'playlist_items=1' impide que
@@ -378,11 +423,8 @@ def _procesar_item(item: dict) -> None:
     formato = normalizar_formato(item.get("formato"))
     resolucion = item.get("resolucion") or "1080"
 
-    # Rutas que yt-dlp va tocando, para poder barrer los restos si esto se
-    # interrumpe. 'filename' es el destino final y 'tmpfilename' el '.part';
-    # se guardan los dos porque el barrido parte del nombre para encontrar
-    # también el '.ytdl' y los fragmentos.
-    temporales: set[str] = set()
+    # Todo lo que yt-dlp escribe a medias va aquí; se borra entero al salir.
+    temporal = _carpeta_temporal(item_id)
 
     def hook(d: dict) -> None:
         """progress_hook de yt-dlp: progreso a SSE + punto de cancelación."""
@@ -390,10 +432,6 @@ def _procesar_item(item: dict) -> None:
             raise DescargaCancelada()
         try:
             estado = d.get("status")
-            for clave in ("filename", "tmpfilename"):
-                valor = d.get(clave)
-                if valor:
-                    temporales.add(str(valor))
             if estado == "downloading":
                 total = d.get("total_bytes") or d.get("total_bytes_estimate")
                 descargado = d.get("downloaded_bytes") or 0
@@ -415,7 +453,7 @@ def _procesar_item(item: dict) -> None:
                     "id": item_id,
                     "progreso": 100.0,
                     "titulo": titulo,
-                    "mensaje": "Procesando…" if formato == "video" else "Convirtiendo a MP3…",
+                    "mensaje": "Procesando…" if formato == "video" else "Convirtiendo…",
                 })
         except DescargaCancelada:
             raise
@@ -434,10 +472,10 @@ def _procesar_item(item: dict) -> None:
         with _LOCK_PROGRESO:
             PROGRESO_ACTIVO[item_id] = 0.0
         sse.emitir({"tipo": "descargando", "id": item_id, "titulo": titulo})
-        emitir_cola_actualizada()
+        emitir_item_actualizado(item_id)
 
         opciones = _construir_opciones_descarga(
-            carpeta_rel, formato, bitrate, resolucion, hook, pp_hook
+            carpeta_rel, formato, bitrate, resolucion, hook, pp_hook, temporal
         )
         info = None
         for intento in range(1, MAX_INTENTOS + 1):
@@ -459,7 +497,7 @@ def _procesar_item(item: dict) -> None:
                     "id": item_id,
                     "progreso": 0.0,
                     "titulo": titulo,
-                    "mensaje": f"Falló; reintentando ({intento + 1}/{MAX_INTENTOS})…",
+                    "mensaje": f"Reintentando ({intento + 1}/{MAX_INTENTOS})…",
                 })
                 _esperar_cancelable(espera, item_id)
         if not info:
@@ -481,13 +519,9 @@ def _procesar_item(item: dict) -> None:
             pass
         sse.emitir({"tipo": "completado", "id": item_id, "titulo": info.get("title") or titulo})
     except DescargaCancelada:
-        _limpiar_temporales(temporales)
         db.cola_actualizar_estado(item_id, "error", MENSAJE_CANCELADA)
         sse.emitir({"tipo": "cancelado", "id": item_id, "titulo": titulo})
     except DownloadError as error:
-        # Se agotaron los intentos o el fallo era definitivo: no va a quedar
-        # nada aprovechable, así que los restos sobran.
-        _limpiar_temporales(temporales)
         # La cancelación puede aflorar envuelta en el DownloadError de yt-dlp.
         if _cancelacion_pedida(item_id):
             db.cola_actualizar_estado(item_id, "error", MENSAJE_CANCELADA)
@@ -497,7 +531,6 @@ def _procesar_item(item: dict) -> None:
             db.cola_actualizar_estado(item_id, "error", msg)
             sse.emitir({"tipo": "error", "id": item_id, "error": msg})
     except Exception as error:  # noqa: BLE001 - robustez: nunca abortar el lote
-        _limpiar_temporales(temporales)
         if _cancelacion_pedida(item_id):
             db.cola_actualizar_estado(item_id, "error", MENSAJE_CANCELADA)
             sse.emitir({"tipo": "cancelado", "id": item_id, "titulo": titulo})
@@ -506,10 +539,13 @@ def _procesar_item(item: dict) -> None:
             db.cola_actualizar_estado(item_id, "error", msg)
             sse.emitir({"tipo": "error", "id": item_id, "error": msg})
     finally:
+        # Acabe como acabe: terminada, lo suyo ya está en la carpeta de música;
+        # cancelada o fallida, no va a quedar nada aprovechable.
+        _borrar_temporal(temporal)
         with _LOCK_PROGRESO:
             PROGRESO_ACTIVO.pop(item_id, None)
             _CANCELACIONES.discard(item_id)
-        emitir_cola_actualizada()
+        emitir_item_actualizado(item_id)
 
 
 def _bucle_worker() -> None:
@@ -561,3 +597,22 @@ def arrancar_worker() -> None:
             )
             _HILOS.add(hilo)
             hilo.start()
+
+
+def hay_tanda_en_marcha() -> bool:
+    """Indica si queda algún worker vivo (es decir, si se está descargando)."""
+    with _LOCK_WORKER:
+        return any(hilo.is_alive() for hilo in _HILOS)
+
+
+def reponer_workers() -> None:
+    """Completa la plantilla de workers si ya hay una tanda en marcha.
+
+    Los workers que encuentran la cola vacía terminan. Si la tanda empezó con
+    una sola canción, queda un único worker; lo que se añada después lo iría
+    bajando él solo, de una en una, por muchas descargas simultáneas que haya
+    configuradas. Se llama en cada alta. Sin tanda en marcha no hace nada: las
+    descargas las arranca el usuario.
+    """
+    if hay_tanda_en_marcha():
+        arrancar_worker()

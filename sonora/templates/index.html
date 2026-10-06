@@ -14,7 +14,7 @@
     <div class="app">
 
         <!-- ===============================================================
-             Barra lateral: marca + navegación + estado de ffmpeg
+             Barra lateral: marca + navegación + estado del entorno + configuración
              =============================================================== -->
         <aside class="sidebar">
             <p class="marca">
@@ -76,50 +76,19 @@
                     Falta ffmpeg: la conversión a MP3 fallará. Instálalo con
                     <code>winget install Gyan.FFmpeg</code>.
                 </p>
-                <!-- Tema de color: el degradado de acento sobre la paleta de
-                     negros. El elegido llega ya aplicado en <html data-tema>;
-                     autocomplete="off" impide que, al recargar, el navegador
-                     restaure la muestra marcada antes y la dé por elegida. -->
-                <fieldset class="temas" id="temas">
-                    <legend>Color</legend>
-                    <label class="tema" data-tema="ocaso" title="Ocaso">
-                        <input type="radio" name="tema" autocomplete="off" value="ocaso">
-                        <span class="visualmente-oculto">Ocaso</span>
-                    </label>
-                    <label class="tema" data-tema="cobre" title="Cobre">
-                        <input type="radio" name="tema" autocomplete="off" value="cobre">
-                        <span class="visualmente-oculto">Cobre</span>
-                    </label>
-                    <label class="tema" data-tema="duna" title="Duna">
-                        <input type="radio" name="tema" autocomplete="off" value="duna">
-                        <span class="visualmente-oculto">Duna</span>
-                    </label>
-                    <label class="tema" data-tema="agave" title="Agave">
-                        <input type="radio" name="tema" autocomplete="off" value="agave">
-                        <span class="visualmente-oculto">Agave</span>
-                    </label>
-                    <label class="tema" data-tema="turquesa" title="Turquesa">
-                        <input type="radio" name="tema" autocomplete="off" value="turquesa">
-                        <span class="visualmente-oculto">Turquesa</span>
-                    </label>
-                    <label class="tema" data-tema="oasis" title="Oasis">
-                        <input type="radio" name="tema" autocomplete="off" value="oasis">
-                        <span class="visualmente-oculto">Oasis</span>
-                    </label>
-                    <label class="tema" data-tema="crepusculo" title="Crepúsculo">
-                        <input type="radio" name="tema" autocomplete="off" value="crepusculo">
-                        <span class="visualmente-oculto">Crepúsculo</span>
-                    </label>
-                    <label class="tema" data-tema="buganvilla" title="Buganvilla">
-                        <input type="radio" name="tema" autocomplete="off" value="buganvilla">
-                        <span class="visualmente-oculto">Buganvilla</span>
-                    </label>
-                    <label class="tema" data-tema="luna" title="Luna">
-                        <input type="radio" name="tema" autocomplete="off" value="luna">
-                        <span class="visualmente-oculto">Luna</span>
-                    </label>
-                </fieldset>
             </div>
+
+            <!-- Configuración: abajo y aparte de los destinos de contenido. -->
+            <nav class="sidebar-nav sidebar-ajustes" aria-label="Ajustes">
+                <ul role="list">
+                    <li>
+                        <button type="button" class="nav-item" data-vista="configuracion">
+                            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span>Configuración</span>
+                        </button>
+                    </li>
+                </ul>
+            </nav>
         </aside>
 
         <!-- ===============================================================
@@ -300,6 +269,75 @@
                         </button>
                     </div>
                     <div id="historial-lista"></div>
+                </section>
+
+                <!-- ─────────────── Vista: Configuración ─────────────── -->
+                <section id="vista-configuracion" class="vista" hidden>
+                    <div class="vista-cabecera">
+                        <h1>Configuración</h1>
+                    </div>
+
+                    <!-- Los ajustes van por grupos: cada uno, una sección con
+                         su título. -->
+                    <section class="config-grupo" aria-labelledby="config-apariencia">
+                        <h2 id="config-apariencia">Apariencia</h2>
+                        <!-- Tema de color: el degradado de acento sobre la paleta
+                             de negros. El elegido llega ya aplicado en
+                             <html data-tema>; autocomplete="off" impide que, al
+                             recargar, el navegador restaure la opción marcada
+                             antes y la dé por elegida. -->
+                        <fieldset class="temas" id="temas">
+                            <legend>Color de la interfaz</legend>
+                            <p class="config-ayuda">El color de acento de toda la app. Cambia al momento y se recuerda.</p>
+                            <div class="temas-opciones">
+                                <label class="tema" data-tema="ocaso">
+                                    <input type="radio" name="tema" autocomplete="off" value="ocaso">
+                                    <span class="tema-muestra" aria-hidden="true"></span>
+                                    <span class="tema-nombre">Ocaso</span>
+                                </label>
+                                <label class="tema" data-tema="cobre">
+                                    <input type="radio" name="tema" autocomplete="off" value="cobre">
+                                    <span class="tema-muestra" aria-hidden="true"></span>
+                                    <span class="tema-nombre">Cobre</span>
+                                </label>
+                                <label class="tema" data-tema="duna">
+                                    <input type="radio" name="tema" autocomplete="off" value="duna">
+                                    <span class="tema-muestra" aria-hidden="true"></span>
+                                    <span class="tema-nombre">Duna</span>
+                                </label>
+                                <label class="tema" data-tema="agave">
+                                    <input type="radio" name="tema" autocomplete="off" value="agave">
+                                    <span class="tema-muestra" aria-hidden="true"></span>
+                                    <span class="tema-nombre">Agave</span>
+                                </label>
+                                <label class="tema" data-tema="turquesa">
+                                    <input type="radio" name="tema" autocomplete="off" value="turquesa">
+                                    <span class="tema-muestra" aria-hidden="true"></span>
+                                    <span class="tema-nombre">Turquesa</span>
+                                </label>
+                                <label class="tema" data-tema="oasis">
+                                    <input type="radio" name="tema" autocomplete="off" value="oasis">
+                                    <span class="tema-muestra" aria-hidden="true"></span>
+                                    <span class="tema-nombre">Oasis</span>
+                                </label>
+                                <label class="tema" data-tema="crepusculo">
+                                    <input type="radio" name="tema" autocomplete="off" value="crepusculo">
+                                    <span class="tema-muestra" aria-hidden="true"></span>
+                                    <span class="tema-nombre">Crepúsculo</span>
+                                </label>
+                                <label class="tema" data-tema="buganvilla">
+                                    <input type="radio" name="tema" autocomplete="off" value="buganvilla">
+                                    <span class="tema-muestra" aria-hidden="true"></span>
+                                    <span class="tema-nombre">Buganvilla</span>
+                                </label>
+                                <label class="tema" data-tema="luna">
+                                    <input type="radio" name="tema" autocomplete="off" value="luna">
+                                    <span class="tema-muestra" aria-hidden="true"></span>
+                                    <span class="tema-nombre">Luna</span>
+                                </label>
+                            </div>
+                        </fieldset>
+                    </section>
                 </section>
 
             </main>

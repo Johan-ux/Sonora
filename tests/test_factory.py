@@ -113,3 +113,39 @@ class TestGuardDeOrigen:
             "/api/cola/limpiar", json={}, headers={"Origin": "https://web-mala.example"}
         )
         assert respuesta.get_json()["error"]
+
+
+class TestAnfitrion:
+    """La app solo contesta si la llaman por un nombre de esta máquina.
+
+    Es la defensa contra el *DNS rebinding*: la web ajena hace que su dominio
+    resuelva a 127.0.0.1 y así Origin y Host coinciden, pero el navegador sigue
+    mandando ese dominio en Host.
+    """
+
+    @pytest.mark.parametrize(
+        "base", ["http://127.0.0.1:5099", "http://localhost:5099", "http://[::1]:5099"]
+    )
+    def test_los_nombres_de_esta_maquina_pasan(self, client, base):
+        assert client.get("/api/salud?red=0", base_url=base).status_code == 200
+
+    @pytest.mark.parametrize(
+        "base",
+        [
+            "http://atacante.example:5099",
+            "http://127.0.0.1.atacante.example:5099",
+            "http://192.168.1.20:5099",
+        ],
+    )
+    def test_otro_nombre_se_rechaza_tambien_al_leer(self, client, base):
+        respuesta = client.get("/api/biblioteca", base_url=base)
+        assert respuesta.status_code == 403
+        assert respuesta.get_json()["error"]
+
+    def test_un_origen_igual_al_host_no_basta(self, client):
+        # El caso del rebinding: mismo dominio en las dos cabeceras.
+        base = "http://atacante.example:5099"
+        respuesta = client.post(
+            "/api/cola/limpiar", json={}, headers={"Origin": base}, base_url=base
+        )
+        assert respuesta.status_code == 403

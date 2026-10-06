@@ -15,6 +15,10 @@ from flask import Flask, jsonify, request
 from . import db, paths
 from .api import registrar_blueprints
 from .paths import DB_PATH, RUTA_RECURSOS
+from .servicios import descargas
+
+# Nombres por los que se puede llegar a la app: solo los de esta máquina.
+ANFITRIONES_LOCALES = ("127.0.0.1", "localhost", "::1")
 
 _INICIALIZADO = False
 _LOCK_INIT = threading.Lock()
@@ -40,7 +44,20 @@ def preparar() -> None:
             db.cola_reiniciar_descargando()
         except Exception:  # noqa: BLE001
             pass
+        # Y los restos a medias de las que ya no están en la cola, fuera.
+        try:
+            descargas.limpiar_temporales_huerfanos()
+        except Exception:  # noqa: BLE001
+            pass
         _INICIALIZADO = True
+
+
+def _anfitrion_local(host: str) -> bool:
+    """Indica si ``host`` (cabecera Host) nombra a esta misma máquina."""
+    try:
+        return urlsplit("//" + host).hostname in ANFITRIONES_LOCALES
+    except ValueError:
+        return False
 
 
 def _origen_permitido(origen: str, host: str) -> bool:
@@ -61,7 +78,7 @@ def _origen_permitido(origen: str, host: str) -> bool:
         return False
     if partes.netloc == host:
         return True
-    if partes.hostname not in ("127.0.0.1", "localhost", "::1"):
+    if partes.hostname not in ANFITRIONES_LOCALES:
         return False
     # Los puertos se comparan como números. Buscar el puerto DENTRO del host
     # como texto aceptaría cualquier número que fuese subcadena suya: contra
@@ -82,7 +99,16 @@ def _bloquear_peticiones_externas():
     Un Origin ausente no se bloquea: lo omiten las peticiones del propio origen
     en algunos navegadores, y las herramientas de línea de órdenes; lo que se
     persigue aquí es el navegador ajeno, que sí lo envía siempre.
+
+    Antes que el origen se mira el anfitrión, y en todas las peticiones,
+    también las de lectura. Una web ajena puede hacer que SU dominio resuelva a
+    127.0.0.1 (*DNS rebinding*) y hablar con la app «desde su propio origen»,
+    con Origin y Host iguales; lo que no puede evitar es que el navegador mande
+    ese dominio en Host. La app solo contesta si la llaman por un nombre de
+    esta máquina.
     """
+    if not _anfitrion_local(request.host):
+        return jsonify({"error": "Anfitrión no permitido."}), 403
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return None
     origen = request.headers.get("Origin", "")

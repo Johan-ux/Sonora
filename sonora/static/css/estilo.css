@@ -412,38 +412,77 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 .marca-a { stop-color: var(--acento-a); }
 .marca-b { stop-color: var(--acento-b); }
 
-/* Selector de tema: una muestra redonda por degradado. Son radios nativos
-   (flechas, foco y lectores de pantalla gratis) con la apariencia quitada. */
-.temas {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-    margin: 12px 0 0;
-    padding: 10px 6px 4px;
-    border: 0;
+/* Configuración aparte de los destinos de contenido, con su línea divisoria. */
+.sidebar-ajustes {
+    padding-top: 10px;
     border-top: 1px solid var(--linea);
 }
 
-.temas legend {
-    /* Flotada deja de montarse sobre el borde y pasa a ser la primera fila;
-       las muestras se reparten debajo. */
-    float: left;
-    width: 100%;
+/* --------------------------- Configuración ------------------------------ */
+
+/* Los ajustes van en grupos con su título. El ancho se limita para que en
+   una ventana grande no se estiren de lado a lado. */
+.config-grupo {
+    max-width: 760px;
+    margin-bottom: 28px;
+}
+
+.config-grupo h2 {
+    margin: 0 0 14px;
+    color: var(--acento);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.config-ayuda {
+    margin: 4px 0 14px;
+    color: var(--texto-suave);
+    font-size: 0.875rem;
+}
+
+/* Selector de tema: una opción por degradado, con su muestra y su nombre.
+   Son radios nativos (flechas, foco y lectores de pantalla gratis) con la
+   apariencia quitada, que ocupan la opción entera. */
+.temas {
+    min-width: 0;
+    margin: 0;
     padding: 0;
-    color: var(--texto-tenue);
-    font-size: 0.8125rem;
+    border: 0;
+}
+
+.temas legend {
+    padding: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+/* Tres columnas: los nueve temas quedan en un cuadro de tres por tres. */
+.temas-opciones {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+    max-width: 568px;
 }
 
 .tema {
     position: relative;
-    width: 22px;
-    height: 22px;
-    flex: none;
-    border-radius: 50%;
-    background: linear-gradient(135deg in oklab, var(--muestra-a), var(--muestra-b));
-    /* El color ES la información: no debe perderse con colores forzados. */
-    forced-color-adjust: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 0 16px 0 12px;
+    border: 1px solid var(--linea);
+    border-radius: var(--radio);
+    background: var(--campo);
+    color: var(--texto-suave);
+    font-size: 0.9375rem;
+    transition: background var(--transicion), border-color var(--transicion),
+                color var(--transicion);
+}
+
+.tema:hover {
+    background: var(--campo-activo);
+    color: var(--texto);
 }
 
 .tema[data-tema="ocaso"]      { --muestra-a: var(--ocaso-a); --muestra-b: var(--ocaso-b); }
@@ -456,24 +495,46 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 .tema[data-tema="buganvilla"] { --muestra-a: var(--buganvilla-a); --muestra-b: var(--buganvilla-b); }
 .tema[data-tema="luna"]       { --muestra-a: var(--luna-a); --muestra-b: var(--luna-b); }
 
+.tema-muestra {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 50%;
+    background: linear-gradient(135deg in oklab, var(--muestra-a), var(--muestra-b));
+    /* El color ES la información: no debe perderse con colores forzados. */
+    forced-color-adjust: none;
+}
+
 .tema input {
     appearance: none;
     position: absolute;
     inset: 0;
     margin: 0;
-    border-radius: 50%;
+    border-radius: inherit;
     cursor: pointer;
 }
 
-/* El elegido se rodea con un anillo separado de la muestra. */
+/* La elegida: borde y tinte del acento, y una marca (no solo el color). */
 .tema:has(:checked) {
-    outline: 2px solid var(--texto);
-    outline-offset: 2px;
+    border-color: var(--acento);
+    background: var(--acento-suave);
+    color: var(--texto);
+    font-weight: 600;
+}
+
+.tema:has(:checked)::after {
+    content: "";
+    width: 10px;
+    height: 5px;
+    margin: 0 4px 4px auto;
+    border-left: 2px solid var(--acento);
+    border-bottom: 2px solid var(--acento);
+    rotate: -45deg;
 }
 
 .tema input:focus-visible {
     outline: 2px solid var(--acento);
-    outline-offset: 5px;
+    outline-offset: 2px;
 }
 
 .aviso-ffmpeg {
@@ -664,7 +725,8 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     background: transparent;
     color: var(--texto-suave);
     cursor: pointer;
-    transition: background var(--transicion), color var(--transicion);
+    transition: background var(--transicion), color var(--transicion),
+                scale var(--transicion);
 }
 
 .btn-icono svg { width: 22px; height: 22px; }
@@ -1532,6 +1594,20 @@ select option::checkmark { color: var(--acento); }
 
 .chip-carpeta svg { width: 14px; height: 14px; flex: none; }
 
+/* Entre los chips del camino («Toda la música › Rock › Clásico») y, tras una
+   línea, las subcarpetas de la carpeta abierta. */
+.carpeta-separador {
+    align-self: center;
+    color: var(--texto-tenue);
+}
+
+.carpeta-divisor {
+    align-self: stretch;
+    width: 1px;
+    margin: 4px 4px;
+    background: var(--linea-fuerte);
+}
+
 .chip-carpeta:hover { background: var(--campo); color: var(--texto); }
 
 .chip-carpeta[aria-pressed="true"] {
@@ -1575,7 +1651,8 @@ select option::checkmark { color: var(--acento); }
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: background var(--transicion), color var(--transicion);
+    transition: background var(--transicion), color var(--transicion),
+                scale var(--transicion);
 }
 
 .pista-play svg { width: 17px; height: 17px; }
@@ -2255,7 +2332,7 @@ select option::checkmark { color: var(--acento); }
     height: 48px;
     background: var(--degradado-diagonal);
     color: var(--sobre-acento);
-    transition: filter var(--transicion);
+    transition: filter var(--transicion), scale var(--transicion);
 }
 
 .btn-play:hover {
@@ -2378,8 +2455,6 @@ dialog {
 }
 
 dialog[open] { display: flex; }
-
-dialog::backdrop { background: var(--velo); }
 
 dialog h2 {
     font-family: var(--fuente-rotulo);
@@ -2547,6 +2622,129 @@ dialog h2 {
 /* WebView2 (Chromium ≥121) respeta scrollbar-width/color estándar,
    declarados en cada contenedor scrolleable; no usamos ::-webkit-scrollbar. */
 
+/* ----------------------------- Movimiento -------------------------------- */
+
+/* Animaciones cortas y siempre como respuesta a algo que hace el usuario:
+   cambiar de vista, abrir un diálogo o un menú, desplegar los filtros. Nada se
+   mueve por su cuenta, y las listas que se repintan a menudo (cola,
+   biblioteca) no se animan: parpadearían. Con «reducir movimiento» se quedan
+   en nada (bloque del final). */
+
+/* Cambio de vista y llegada de resultados: lo que entra aparece con un fundido
+   y un desplazamiento mínimo. El atributo hidden saca la vista de la página,
+   así que la animación arranca sola cada vez que vuelve. */
+.vista,
+.resultados-grid {
+    animation: entra-contenido 180ms ease-out;
+}
+
+@keyframes entra-contenido {
+    from { opacity: 0; translate: 0 6px; }
+}
+
+/* La ventana de vídeo, al abrirse. */
+.escenario-video {
+    animation: entra-ventana 160ms ease-out;
+}
+
+@keyframes entra-ventana {
+    from { opacity: 0; scale: 0.98; }
+}
+
+/* Diálogos: entran y salen de la capa superior con fundido y un leve cambio
+   de escala; el velo de fondo los acompaña. «overlay» y «display» van en la
+   transición para que la salida se vea antes de que desaparezcan. */
+dialog {
+    opacity: 0;
+    scale: 0.96;
+    transition-property: opacity, scale, overlay, display;
+    transition-duration: 160ms;
+    transition-timing-function: ease-out;
+    transition-behavior: allow-discrete;
+}
+
+dialog[open] {
+    opacity: 1;
+    scale: 1;
+}
+
+@starting-style {
+    dialog[open] {
+        opacity: 0;
+        scale: 0.96;
+    }
+}
+
+dialog::backdrop {
+    background-color: transparent;
+    transition-property: background-color, overlay, display;
+    transition-duration: 160ms;
+    transition-timing-function: ease-out;
+    transition-behavior: allow-discrete;
+}
+
+dialog[open]::backdrop { background-color: var(--velo); }
+
+@starting-style {
+    dialog[open]::backdrop { background-color: transparent; }
+}
+
+/* Menú «Añadir como…»: igual que la lista de los desplegables. */
+.menu-formato {
+    opacity: 0;
+    translate: 0 -6px;
+    transition-property: opacity, translate, display;
+    transition-duration: 140ms;
+    transition-timing-function: ease;
+    transition-behavior: allow-discrete;
+}
+
+.menu-formato.abierto {
+    opacity: 1;
+    translate: 0 0;
+}
+
+@starting-style {
+    .menu-formato.abierto {
+        opacity: 0;
+        translate: 0 -6px;
+    }
+}
+
+/* Filtro «Características»: se despliega hasta su alto natural en lugar de
+   aparecer de golpe. «interpolate-size» es lo que permite animar hasta auto. */
+.filtro-caracteristicas {
+    interpolate-size: allow-keywords;
+}
+
+.filtro-caracteristicas::details-content {
+    block-size: 0;
+    opacity: 0;
+    overflow: clip;
+    transition-property: block-size, opacity, content-visibility;
+    transition-duration: 180ms;
+    transition-timing-function: ease-out;
+    transition-behavior: allow-discrete;
+}
+
+.filtro-caracteristicas[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+}
+
+/* Los botones redondos ceden un poco al pulsarlos, como los demás. */
+.btn-icono:active,
+.pista-play:active {
+    scale: 0.92;
+}
+
+/* Cambio de tema: fundido de toda la página entre un color y el otro (lo
+   lanza aplicarTema() con una transición de vista). */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 220ms;
+}
+
 /* ---------------------------- Responsive -------------------------------- */
 
 /* La ventana tiene un mínimo de 940px (sonora/escritorio.py); el modo compacto entra
@@ -2556,17 +2754,10 @@ dialog h2 {
 
     .marca-nombre,
     .nav-item span:not(.nav-badge),
-    .sidebar-pie > :not(.temas),
-    .temas legend { display: none; }
+    .sidebar-pie { display: none; }
 
-    /* Del pie solo cabe el selector de tema, con las muestras en columna. */
-    .sidebar-pie { padding: 0; }
-    .temas {
-        flex-direction: column;
-        flex-wrap: nowrap;
-        gap: 8px;
-        padding: 12px 0 2px;
-    }
+    /* Sin el pie (los avisos no caben), la configuración se va sola abajo. */
+    .sidebar-ajustes { margin-top: auto; }
 
     .nav-item { justify-content: center; min-height: 40px; padding: 0; }
     .nav-badge {
@@ -2599,7 +2790,7 @@ dialog h2 {
     .reproductor { border-top-color: CanvasText; }
     .escenario-video { outline: 1px solid CanvasText; }
     .nav-item[aria-current="page"] { outline: 1px solid Highlight; }
-    .tema:has(:checked) { outline-color: Highlight; }
+    .tema:has(:checked) { border-color: Highlight; }
     input[type="range"]::-webkit-slider-thumb { opacity: 1; }
 }
 
@@ -2613,4 +2804,14 @@ dialog h2 {
     }
     .eq.activo span { animation: none; height: 60%; }
     .cargando::before { animation: none; }
+    /* El selector universal no alcanza a estos pseudoelementos. */
+    ::backdrop,
+    ::details-content {
+        transition-duration: 0.01ms !important;
+    }
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+        animation: none !important;
+    }
 }

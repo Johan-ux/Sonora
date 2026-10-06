@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import time
+from pathlib import Path
 
 from flask import Blueprint, jsonify, request, send_file
 
@@ -24,6 +26,23 @@ def listar():
     return jsonify(servicio.escanear(q=q, carpeta_rel=carpeta_rel))
 
 
+def _borrar_con_paciencia(destino: Path, intentos: int = 6, espera: float = 0.15) -> None:
+    """Borra el fichero, insistiendo un momento si Windows dice que está en uso.
+
+    El reproductor suelta la pista justo antes de pedir que se borre, pero el
+    servidor puede tardar unas décimas en cerrar el fichero que le estaba
+    sirviendo, y mientras tanto Windows no deja eliminarlo.
+    """
+    for intento in range(1, intentos + 1):
+        try:
+            destino.unlink()
+            return
+        except PermissionError:
+            if intento == intentos:
+                raise
+            time.sleep(espera)
+
+
 @bp.post("/api/biblioteca/eliminar")
 def eliminar_pista():
     """Borra del disco un archivo de la biblioteca (mp3/mp4).
@@ -41,7 +60,7 @@ def eliminar_pista():
     if destino.suffix.lower() not in (".mp3", ".mp4"):
         return error_json("Tipo de archivo no permitido.", 403)
     try:
-        destino.unlink()
+        _borrar_con_paciencia(destino)
     except OSError as error:
         return error_json(f"No se pudo eliminar: {colapsar_error(error)}", 500)
     servicio.olvidar_cache(destino)

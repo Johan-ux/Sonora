@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import re
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote, quote_plus, urlsplit
 
 # Si falta yt-dlp, el ImportError se propaga hasta el punto de entrada
 # (sonora.escritorio / sonora.cli), que es quien sabe mostrar el error al
@@ -73,9 +73,25 @@ def es_url(texto: str) -> bool:
 
 
 def es_url_playlist(texto: str) -> bool:
-    """Heurística: la URL apunta a una playlist de YouTube."""
-    t = (texto or "").lower()
-    return "list=" in t or "/playlist" in t
+    """Heurística: la URL apunta a una playlist de YouTube.
+
+    Lo es si lleva el parámetro ``list=`` o si su ruta es ``/playlist``. Se
+    mira por partes y no como texto: buscar «/playlist» a secas casaba también
+    con la pestaña ``/@canal/playlists``, que es una página de canal.
+    """
+    try:
+        partes = urlsplit((texto or "").strip())
+    except ValueError:
+        return False
+    if re.search(r"(?:^|&)list=", partes.query, re.IGNORECASE):
+        return True
+    return partes.path.rstrip("/").lower() == "/playlist"
+
+
+def id_video(url: str) -> str:
+    """Id del vídeo que señala la URL (``v=…`` o ``youtu.be/<id>``), o ''."""
+    m = re.search(r"(?:[?&]v=|youtu\.be/)([\w-]{11})", url or "")
+    return m.group(1) if m else ""
 
 
 def es_url_canal(texto: str) -> bool:
@@ -86,9 +102,9 @@ def es_url_canal(texto: str) -> bool:
     ``/@handle``, ``/channel/UC…``, ``/c/Nombre`` y ``/user/Nombre`` (con o sin
     pestaña ``/videos``, ``/shorts``, etc.).
     """
-    t = (texto or "").lower()
-    if "list=" in t or "/playlist" in t:
+    if es_url_playlist(texto):
         return False
+    t = (texto or "").lower()
     return ("/@" in t) or ("/channel/" in t) or ("/c/" in t) or ("/user/" in t)
 
 
@@ -159,7 +175,10 @@ def parametro_sp(filtros: dict) -> str:
 def _entrada_a_resultado(entrada: dict) -> dict:
     """Normaliza una entrada de yt-dlp al formato de resultado del contrato."""
     vid = entrada.get("id") or ""
-    url = entrada.get("url") or entrada.get("webpage_url") or ""
+    # 'webpage_url' es la página del vídeo y manda. En una extracción completa
+    # con un único formato, 'url' es la dirección firmada del stream: en la cola
+    # caducaría a las horas y bajaría como un «videoplayback» sin nombre.
+    url = entrada.get("webpage_url") or entrada.get("url") or ""
     # En extracción flat 'url' puede ser solo el id; reconstruimos la URL.
     if url and not es_url(url):
         url = f"https://www.youtube.com/watch?v={vid or url}"
@@ -365,8 +384,16 @@ def _expandir_flat(url_objetivo: str, fallback: str) -> tuple[str, list[dict], i
         )
     titulo = (info.get("title") or "").strip()
     for entrada in info.get("entries", []) or []:
-        if entrada:
+        if not entrada:
+            continue
+        # La pestaña «Listas» de un canal no trae vídeos sino playlists. Como
+        # canción saldría una tarjeta sin miniatura que, al añadirla, bajaría
+        # solo el primer vídeo de la lista con el nombre de esta.
+        tipo = _tipo_de_entrada(entrada)
+        if tipo == "video":
             items.append(_entrada_a_resultado(entrada))
+        else:
+            items.append(_coleccion_a_resultado(entrada, tipo))
     # Algunas URLs (p. ej. un Mix extraído en modo flat) devuelven un único
     # vídeo sin 'entries'. Antes que devolver vacío, mostramos ese vídeo.
     # Solo si el resultado ES un vídeo: una playlist/canal legítimamente vacío

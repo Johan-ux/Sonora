@@ -34,9 +34,9 @@ por completo.
 
 ## Color de la interfaz
 
-Sonora es negra, con un único acento en degradado. Al pie de la barra lateral
-hay una muestra por cada uno; el cambio es inmediato y se recuerda para la
-próxima vez.
+Sonora es negra, con un único acento en degradado. Se elige en
+**Configuración** (abajo, en la barra lateral), dentro de *Apariencia*: hay una
+opción por cada uno, el cambio es inmediato y se recuerda para la próxima vez.
 
 | Tema           | Degradado                       |
 | -------------- | ------------------------------- |
@@ -173,6 +173,12 @@ El botón de la flecha **oculta** el vídeo sin detenerlo, para seguir solo con
 el sonido; el icono de la cámara en la barra de reproducción lo vuelve a
 mostrar.
 
+## Una sola ventana
+
+Sonora no se abre dos veces sobre los mismos datos: si ya está abierta, un
+segundo arranque trae al frente la ventana que hay y termina. Dos copias a la
+vez se pisarían la cola de descargas.
+
 ## Descargas en paralelo
 
 Por defecto se descargan **tres canciones a la vez**; se ajusta en
@@ -192,9 +198,15 @@ intento. Los fallos definitivos (vídeo privado, borrado o bloqueado en tu
 país) no se reintentan: se marcan como error directamente, para no hacer
 esperar al resto de la cola.
 
-Al cancelar una descarga (o cuando falla del todo) se borran los ficheros a
-medias que deja yt-dlp, en lugar de quedarse ocupando sitio en la carpeta de
-música para siempre.
+Mientras una canción se descarga y se convierte, sus ficheros a medias no
+están en la carpeta de música sino en una de trabajo aparte (`temporal/`,
+junto a `descargas/`): a la biblioteca solo llega el resultado terminado. Al
+cancelar una descarga, o cuando falla del todo, esos restos se borran. Si la
+app se cierra a media descarga, al volver a abrirla la canción sigue en la
+cola y continúa por donde iba.
+
+Lo que añadas a la cola con una tanda ya en marcha se descarga también, y
+con las mismas descargas a la vez que tengas configuradas.
 
 ## Aviso de actualización
 
@@ -205,6 +217,9 @@ un aviso abajo en la barra lateral:
   cambia a menudo y un yt-dlp viejo deja de descargar (`HTTP Error 403`). El
   botón **Actualizar ahora** lanza `pip install --upgrade yt-dlp` desde la
   propia app; al terminar hay que **reiniciar Sonora** para que surta efecto.
+  Hasta que reinicies no se puede buscar ni descargar (la versión nueva en
+  disco y la vieja en memoria no deben mezclarse), y por lo mismo no se
+  puede actualizar con descargas en marcha.
 - **Tu yt-dlp pasa de 90 días** y no se pudo consultar si hay uno más nuevo
   (sin conexión, por ejemplo).
 - **Falta un runtime de JavaScript**, con la orden para instalarlo.

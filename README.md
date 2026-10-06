@@ -85,7 +85,7 @@ sonora/       Paquete principal: app de escritorio (__main__, escritorio) y CLI 
 datos/        Tus datos en desarrollo: descargas/ + biblioteca.db (fuera de git)
 docs/         Documentación
 ejemplos/     Ficheros de ejemplo (urls.example.txt para la CLI)
-scripts/      iniciar.bat, construir_exe.bat y sonora.spec (PyInstaller)
+scripts/      iniciar.bat, construir_exe.bat, sonora.spec (PyInstaller) y generar_icono.py
 tests/        Suite de pytest
 ```
 

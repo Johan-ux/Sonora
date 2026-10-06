@@ -7,4 +7,5 @@
 yt-dlp>=2026.8.19
 flask>=3.0,<4
 mutagen>=1.47,<2
-pywebview>=5.0,<7
+# 5.3 es la primera versión cuyo start() admite el icono de la ventana.
+pywebview>=5.3,<7

@@ -10,6 +10,7 @@ funcionar tanto en desarrollo como empaquetado con PyInstaller (consola oculta,
 sin depender del cwd).
 """
 
+import os
 import socket
 import sys
 import threading
@@ -19,7 +20,21 @@ import urllib.request
 
 # `crear_app()` inicializa la base de datos (vía preparar()) y registra los
 # blueprints, devolviendo la aplicación lista para servir.
+from . import paths
 from .factory import crear_app
+from .paths import RUTA_RECURSOS
+
+# Icono de la ventana: la marca con los colores de «ocaso», el tema por defecto.
+# Va fijo aunque se elija otro tema (lo genera scripts/generar_icono.py).
+RUTA_ICONO = RUTA_RECURSOS / "static" / "img" / "sonora.ico"
+# Nombre con el que Windows identifica la app (ver identificar_app).
+ID_APP_WINDOWS = "Sonora.Escritorio"
+
+# Fichero que reserva la carpeta de datos para una sola instancia de la app.
+NOMBRE_CERROJO = "sonora.lock"
+# Se guarda aquí mientras viva el proceso: si el fichero se cerrase, el
+# cerrojo se soltaría.
+_cerrojo_de_instancia = None
 
 # Título de la ventana y dimensiones (según contrato).
 TITULO_VENTANA = "Sonora"
@@ -74,9 +89,13 @@ def esperar_servidor(url_base: str, intentos: int = 100, espera: float = 0.1) ->
     (~10 s por defecto). Cualquier respuesta HTTP (incluido un código de error)
     cuenta como "vivo": lo que nos interesa es que el socket acepte y conteste.
     """
+    # Sin proxy. urllib aplica el del sistema (o HTTP_PROXY) también a
+    # 127.0.0.1, y entonces quien contesta —o deja de contestar— es el proxy:
+    # un 502 suyo daría por viva una app que aún no escucha.
+    abrir = urllib.request.build_opener(urllib.request.ProxyHandler({})).open
     for _ in range(intentos):
         try:
-            with urllib.request.urlopen(url_base, timeout=1) as resp:
+            with abrir(url_base, timeout=1) as resp:
                 # Basta con que conteste algo.
                 resp.read(1)
                 return True
@@ -104,6 +123,81 @@ def reportar_error(mensaje: str) -> None:
             ctypes.windll.user32.MessageBoxW(None, mensaje, TITULO_VENTANA, 0x10)
         except Exception:  # noqa: BLE001 - el aviso nunca debe romper el arranque
             pass
+
+
+def tomar_cerrojo_de_instancia(carpeta):
+    """Reserva la carpeta de datos para este proceso.
+
+    Devuelve el fichero abierto que sostiene el cerrojo, o ``None`` si ya lo
+    tiene otra instancia. Dos Sonoras sobre los mismos datos se pisan: al
+    arrancar, la segunda devuelve a la cola lo que la primera está descargando,
+    y el mismo vídeo acaba bajándose dos veces a la vez sobre los mismos
+    ficheros.
+
+    El cerrojo es del sistema operativo sobre un fichero abierto: se suelta
+    solo cuando el proceso termina, también si se cierra mal, así que nunca hay
+    que limpiarlo a mano. Lanza ``OSError`` si la carpeta no se puede crear.
+    """
+    carpeta.mkdir(parents=True, exist_ok=True)
+    fichero = open(carpeta / NOMBRE_CERROJO, "a+b")  # noqa: SIM115 - debe seguir abierto
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            fichero.seek(0)
+            msvcrt.locking(fichero.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fichero.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        fichero.close()
+        return None
+    return fichero
+
+
+def mostrar_ventana_existente() -> bool:
+    """Trae al frente la ventana de la instancia que ya está abierta.
+
+    Devuelve True si la encontró. Solo sabe hacerlo en Windows; en otra
+    plataforma devuelve False y quien llama avisa con un mensaje.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+
+        usuario = ctypes.windll.user32
+        ventana = usuario.FindWindowW(None, TITULO_VENTANA)
+        if not ventana:
+            return False
+        if usuario.IsIconic(ventana):
+            usuario.ShowWindow(ventana, 9)  # SW_RESTORE: estaba minimizada
+        usuario.SetForegroundWindow(ventana)
+        return True
+    except Exception:  # noqa: BLE001 - es una cortesía: nunca debe romper la salida
+        return False
+
+
+def identificar_app() -> None:
+    """Da a la app un nombre propio ante Windows cuando corre sobre el intérprete.
+
+    Lanzada con ``python -m sonora``, Windows agrupa la ventana con Python y
+    enseña el icono de este en la barra de tareas, tenga la ventana el que
+    tenga. Con un identificador propio usa el de la ventana.
+
+    Empaquetada no hace falta (el ``.exe`` ya lleva su icono) y sería
+    contraproducente: un acceso directo anclado dejaría de corresponderse con
+    la ventana abierta.
+    """
+    if sys.platform != "win32" or getattr(sys, "frozen", False):
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(ID_APP_WINDOWS)
+    except Exception:  # noqa: BLE001 - es cosmético: nunca debe impedir el arranque
+        pass
 
 
 def esta_maximizada(ventana) -> bool:
@@ -172,6 +266,22 @@ def main() -> int:
         )
         return 1
 
+    # Una sola instancia por carpeta de datos, y se comprueba antes de tocar la
+    # base de datos: crear_app() ya da por interrumpido lo que encuentra
+    # descargándose.
+    global _cerrojo_de_instancia
+    try:
+        _cerrojo_de_instancia = tomar_cerrojo_de_instancia(paths.DIR_BASE)
+    except OSError as exc:
+        reportar_error(
+            f"No se pudo preparar la carpeta de datos de la aplicación: {exc}"
+        )
+        return 1
+    if _cerrojo_de_instancia is None:
+        if not mostrar_ventana_existente():
+            reportar_error("Sonora ya está abierta.")
+        return 0
+
     # Creamos la app (crear_app inicializa la BD y reanuda descargas interrumpidas
     # ANTES de servir: si no, la primera llamada a la base de datos reventaría).
     try:
@@ -212,6 +322,9 @@ def main() -> int:
         )
         return 1
 
+    # Antes de crear la ventana: Windows decide con qué app agruparla al abrirla.
+    identificar_app()
+
     # Creamos la ventana nativa apuntando al servidor local.
     ventana = webview.create_window(
         TITULO_VENTANA,
@@ -228,5 +341,6 @@ def main() -> int:
 
     # webview.start() bloquea en el hilo principal hasta que se cierra la ventana.
     # Al volver, el proceso termina y los hilos daemon (servidor) mueren con él.
-    webview.start()
+    # Sin el icono, la ventana enseñaría el del ejecutable (el de Python).
+    webview.start(icon=str(RUTA_ICONO))
     return 0

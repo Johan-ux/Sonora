@@ -9,6 +9,9 @@ autouse fixture ``sin_worker`` (no se llama a /api/cola/descargar y
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 
 import sonora.servicios.descargas as descargas
@@ -325,6 +328,20 @@ class TestConfig:
         client.post("/api/config", json={"tema": "cobre"})
         assert b'<html lang="es" data-tema="cobre">' in client.get("/").data
 
+    def test_el_selector_de_tema_vive_en_la_vista_de_configuracion(self):
+        html = (RUTA_RECURSOS / "templates" / "index.html").read_text(encoding="utf-8")
+        assert 'id="temas"' not in html[: html.index("</aside>")]
+        assert html.index('id="vista-configuracion"') < html.index('id="temas"')
+
+    def test_cada_destino_de_la_navegacion_tiene_su_vista(self):
+        # cambiarVista() esconde todas las vistas menos «vista-<destino>»: un
+        # destino sin la suya dejaría la zona principal vacía.
+        html = (RUTA_RECURSOS / "templates" / "index.html").read_text(encoding="utf-8")
+        destinos = re.findall(r'class="nav-item" data-vista="([a-z]+)"', html)
+        assert "configuracion" in destinos
+        for destino in destinos:
+            assert f'id="vista-{destino}"' in html
+
     def test_modo_de_video_invalido_cae_a_flotante(self, client):
         client.post("/api/config", json={"video_modo": "teatro"})
         client.post("/api/config", json={"video_modo": "cine"})
@@ -492,3 +509,203 @@ class TestBibliotecaEliminar:
         (entorno / "nota.txt").write_text("x", encoding="utf-8")
         respuesta = client.post("/api/biblioteca/eliminar", json={"archivo": "nota.txt"})
         assert respuesta.status_code == 403
+
+
+# --------------------------------------------------------------------------- #
+# Altas con una tanda en marcha, reintentos y URLs de vídeo dentro de una lista
+# --------------------------------------------------------------------------- #
+
+class TestAnadirConTandaEnMarcha:
+    """Cada alta repone la plantilla de workers (ver descargas.reponer_workers)."""
+
+    @pytest.fixture()
+    def reposiciones(self, monkeypatch):
+        llamadas = []
+        monkeypatch.setattr(descargas, "reponer_workers", lambda: llamadas.append(1))
+        return llamadas
+
+    def test_agregar_un_item(self, client, reposiciones):
+        client.post("/api/cola/agregar", json={"url": "https://x/1"})
+        assert reposiciones == [1]
+
+    def test_un_duplicado_no_cuenta(self, client, reposiciones):
+        client.post("/api/cola/agregar", json={"url": "https://x/1"})
+        client.post("/api/cola/agregar", json={"url": "https://x/1"})
+        assert reposiciones == [1]
+
+    def test_agregar_una_playlist(self, client, reposiciones):
+        client.post(
+            "/api/cola/agregar_playlist",
+            json={"items": [{"url": f"https://x/{i}"} for i in range(4)]},
+        )
+        assert reposiciones == [1]
+
+
+class TestPlaylistDeUnaVez:
+    def test_no_lee_la_configuracion_por_cada_cancion(self, client, monkeypatch):
+        lecturas = []
+        real = db.config_obtener
+
+        def contar(clave, por_defecto=""):
+            lecturas.append(clave)
+            return real(clave, por_defecto)
+
+        monkeypatch.setattr(db, "config_obtener", contar)
+        respuesta = client.post(
+            "/api/cola/agregar_playlist",
+            json={"items": [{"url": f"https://x/{i}"} for i in range(60)]},
+        )
+        assert respuesta.get_json()["total"] == 60
+        # Bitrate, formato y resolución: una vez por petición, no por canción.
+        assert len(lecturas) <= 3
+
+    def test_los_valores_de_la_peticion_llegan_a_cada_item(self, client):
+        client.post(
+            "/api/cola/agregar_playlist",
+            json={
+                "items": [{"url": "https://x/1"}, {"url": "https://x/2", "formato": "audio"}],
+                "formato": "video",
+                "resolucion": "720",
+            },
+        )
+        cola = client.get("/api/cola").get_json()["items"]
+        assert [(i["formato"], i["resolucion"]) for i in cola] == [
+            ("video", "720"),
+            ("audio", "720"),  # el ítem manda sobre el valor común
+        ]
+
+
+class TestReintentarLoQueYaEstaEnLaCola:
+    def test_explica_por_que_no_se_reintenta(self, client):
+        client.post("/api/cola/agregar", json={"url": "https://x/1"})
+        viejo = client.get("/api/cola").get_json()["items"][0]["id"]
+        db.cola_actualizar_estado(viejo, "error", "boom")
+        client.post("/api/cola/agregar", json={"url": "https://x/1"})
+
+        respuesta = client.post("/api/cola/reintentar", json={"id": viejo})
+
+        assert respuesta.status_code == 409
+        assert "ya está" in respuesta.get_json()["error"]
+        estados = sorted(i["estado"] for i in client.get("/api/cola").get_json()["items"])
+        assert estados == ["en_cola", "error"]
+
+
+class TestBuscarVideoDentroDeUnaLista:
+    URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=WL&index=2"
+    VIDEO = {"id": "dQw4w9WgXcQ", "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+             "titulo": "El vídeo", "tipo": "video"}
+
+    @pytest.fixture(autouse=True)
+    def _video(self, monkeypatch):
+        monkeypatch.setattr(youtube, "info_video", lambda url: dict(self.VIDEO))
+
+    def test_si_la_lista_no_se_puede_abrir_se_muestra_el_video(self, client, monkeypatch):
+        def privada(url):
+            raise RuntimeError("YouTube no devolvió datos")
+
+        monkeypatch.setattr(youtube, "expandir_playlist", privada)
+        datos = client.post("/api/buscar", json={"q": self.URL}).get_json()
+        assert datos["es_playlist"] is False
+        assert datos["resultados"] == [self.VIDEO]
+
+    def test_si_la_lista_viene_vacia_tambien(self, client, monkeypatch):
+        monkeypatch.setattr(youtube, "expandir_playlist", lambda url: ("Ver más tarde", [], 0))
+        datos = client.post("/api/buscar", json={"q": self.URL}).get_json()
+        assert datos["resultados"] == [self.VIDEO]
+
+    def test_si_la_lista_se_abre_gana_la_lista(self, client, monkeypatch):
+        temas = [{"id": "a", "url": "https://x/a", "tipo": "video"}]
+        monkeypatch.setattr(youtube, "expandir_playlist", lambda url: ("Mi lista", temas, 1))
+        datos = client.post("/api/buscar", json={"q": self.URL}).get_json()
+        assert datos["es_playlist"] is True
+        assert datos["resultados"] == temas
+
+    def test_una_lista_sin_video_al_que_caer_sigue_fallando(self, client, monkeypatch):
+        def privada(url):
+            raise RuntimeError("YouTube no devolvió datos")
+
+        monkeypatch.setattr(youtube, "expandir_playlist", privada)
+        respuesta = client.post(
+            "/api/buscar", json={"q": "https://www.youtube.com/playlist?list=PLprivada"}
+        )
+        assert respuesta.status_code == 502
+
+
+class TestBuscarPestanaDeListasDeUnCanal:
+    def test_son_colecciones_que_abrir_no_canciones_en_lotes(self, client, monkeypatch):
+        listas = [
+            {"id": "", "url": "https://www.youtube.com/playlist?list=PL1", "tipo": "lista"},
+            {"id": "", "url": "https://www.youtube.com/playlist?list=PL2", "tipo": "lista"},
+        ]
+        monkeypatch.setattr(youtube, "expandir_canal", lambda url: ("Canal", listas, 2))
+        datos = client.post(
+            "/api/buscar", json={"q": "https://www.youtube.com/@canal/playlists"}
+        ).get_json()
+        assert datos["es_playlist"] is False
+        assert datos["resultados"] == listas
+
+    def test_los_videos_de_un_canal_siguen_yendo_por_lotes(self, client, monkeypatch):
+        videos = [{"id": "a", "url": "https://x/a", "tipo": "video"}]
+        monkeypatch.setattr(youtube, "expandir_canal", lambda url: ("Canal", videos, 1))
+        datos = client.post(
+            "/api/buscar", json={"q": "https://www.youtube.com/@canal"}
+        ).get_json()
+        assert datos["es_playlist"] is True and datos["es_canal"] is True
+
+
+class TestBuscarCanalConListasMezcladas:
+    def test_por_lotes_solo_van_los_videos(self, client, monkeypatch):
+        mezcla = [
+            {"id": "a", "url": "https://x/a", "tipo": "video"},
+            {"id": "", "url": "https://www.youtube.com/playlist?list=PL1", "tipo": "lista"},
+        ]
+        monkeypatch.setattr(youtube, "expandir_canal", lambda url: ("Canal", mezcla, 2))
+        datos = client.post(
+            "/api/buscar", json={"q": "https://www.youtube.com/@canal/featured"}
+        ).get_json()
+        # «Añadir todo» no debe encolar la lista como si fuera una canción.
+        assert datos["es_playlist"] is True
+        assert [r["tipo"] for r in datos["resultados"]] == ["video"]
+        assert datos["obtenidas"] == 1
+
+
+class TestBibliotecaEliminarEnUso:
+    """El reproductor suelta la pista justo antes de pedir que se borre; el
+    servidor puede tardar unas décimas en cerrar el fichero que servía."""
+
+    @pytest.fixture()
+    def pista(self, entorno, monkeypatch):
+        from sonora.api import biblioteca as api_biblioteca
+
+        monkeypatch.setattr(api_biblioteca.time, "sleep", lambda segundos: None)
+        ruta = entorno / "tema.mp3"
+        ruta.write_bytes(b"musica")
+        return ruta
+
+    def _unlink_ocupado(self, monkeypatch, veces):
+        intentos = []
+        real = Path.unlink
+
+        def unlink(ruta, *args, **kwargs):
+            intentos.append(ruta.name)
+            if len(intentos) <= veces:
+                raise PermissionError(13, "El archivo está siendo utilizado por otro proceso")
+            return real(ruta, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", unlink)
+        return intentos
+
+    def test_insiste_hasta_que_windows_lo_suelta(self, client, pista, monkeypatch):
+        intentos = self._unlink_ocupado(monkeypatch, veces=2)
+        respuesta = client.post("/api/biblioteca/eliminar", json={"archivo": "tema.mp3"})
+        assert respuesta.status_code == 200
+        assert len(intentos) == 3
+        assert not pista.exists()
+
+    def test_si_no_lo_suelta_lo_dice(self, client, pista, monkeypatch):
+        intentos = self._unlink_ocupado(monkeypatch, veces=99)
+        respuesta = client.post("/api/biblioteca/eliminar", json={"archivo": "tema.mp3"})
+        assert respuesta.status_code == 500
+        assert "No se pudo eliminar" in respuesta.get_json()["error"]
+        assert len(intentos) == 6  # insiste un momento, no para siempre
+        assert pista.exists()

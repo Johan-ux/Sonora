@@ -40,8 +40,45 @@ DIAS_PARA_CADUCAR = 90
 # Tope de espera de 'pip install --upgrade'. Generoso: descarga de la red.
 TIMEOUT_PIP = 300
 
+# Última consulta a PyPI: (momento en segundos Unix, versión). Va con el reloj
+# de pared y no con el monótono para poder guardarla entre sesiones.
 _cache_pypi: tuple[float, str] | None = None
 _LOCK_CACHE = threading.Lock()
+
+# Cierto desde que se actualiza yt-dlp hasta que se reinicia la app.
+_reinicio_pendiente = False
+
+MENSAJE_REINICIO = "yt-dlp se ha actualizado: reinicia Sonora para seguir buscando y descargando."
+
+
+def reinicio_pendiente() -> bool:
+    """Indica si yt-dlp se actualizó en esta sesión y falta reiniciar.
+
+    yt-dlp importa sus extractores cuando los necesita. Tras cambiarlo en
+    disco, lo que se cargue a partir de entonces es de la versión nueva y se
+    encuentra con el núcleo de la vieja ya en memoria: una mezcla que puede
+    fallar de cualquier manera. Hasta reiniciar, la app no usa yt-dlp.
+    """
+    return _reinicio_pendiente
+
+
+def cache_pypi() -> tuple[float, str] | None:
+    """La última consulta a PyPI recordada: (momento Unix, versión), o None."""
+    with _LOCK_CACHE:
+        return _cache_pypi
+
+
+def recordar_pypi(momento: float, version: str) -> None:
+    """Da por hecha una consulta a PyPI de una sesión anterior.
+
+    Quien guarda el dato entre sesiones es la capa de la app (este módulo no
+    toca la base de datos para que la CLI pueda usarlo); sin esto, cada
+    arranque volvería a consultar PyPI por reciente que fuera la respuesta.
+    """
+    global _cache_pypi
+    if version:
+        with _LOCK_CACHE:
+            _cache_pypi = (float(momento), str(version))
 
 
 def empaquetada() -> bool:
@@ -118,7 +155,8 @@ def ultima_version_pypi(forzar: bool = False) -> str:
     with _LOCK_CACHE:
         if not forzar and _cache_pypi is not None:
             momento, valor = _cache_pypi
-            if (time.monotonic() - momento) < TTL_CACHE:
+            # El «0 <=» descarta una marca del futuro (reloj cambiado).
+            if 0 <= (time.time() - momento) < TTL_CACHE:
                 return valor
     version = ""
     try:
@@ -133,7 +171,7 @@ def ultima_version_pypi(forzar: bool = False) -> str:
         version = ""
     if version:
         with _LOCK_CACHE:
-            _cache_pypi = (time.monotonic(), version)
+            _cache_pypi = (time.time(), version)
     return version
 
 
@@ -163,6 +201,7 @@ def estado(consultar_red: bool = True) -> dict:
         "runtime_js": {"nombre": runtime or "", "disponible": runtime is not None,
                        "soportados": list(RUNTIMES_JS)},
         "empaquetada": empaquetada(),
+        "reinicio_pendiente": reinicio_pendiente(),
     }
 
 
@@ -173,8 +212,10 @@ def actualizar_yt_dlp() -> dict:
     pip``) y sin shell: los argumentos son fijos, nada procede del usuario.
 
     Nota: el yt-dlp ya importado sigue en memoria, así que la versión nueva no
-    entra en vigor hasta reiniciar la app; el mensaje lo deja claro.
+    entra en vigor hasta reiniciar la app; el mensaje lo deja claro y, desde
+    ese momento, ``reinicio_pendiente()`` cierra el paso a yt-dlp.
     """
+    global _reinicio_pendiente
     if empaquetada():
         return {
             "ok": False,
@@ -209,6 +250,7 @@ def actualizar_yt_dlp() -> dict:
     # La versión recién instalada se lee de PyPI (la cacheada), no del proceso
     # en marcha: 'import yt_dlp' seguiría devolviendo la vieja hasta reiniciar.
     nueva = ultima_version_pypi(forzar=True) or ""
+    _reinicio_pendiente = True
     return {
         "ok": True,
         "mensaje": "yt-dlp actualizado. Reinicia Sonora para usar la versión nueva.",

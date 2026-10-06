@@ -32,6 +32,8 @@ git: puedes borrarlas cuando quieras.
   (más los backends de pywebview en Windows), que PyInstaller no detecta
   estáticamente.
 - **`console=False`**: es una app de ventana; no queremos consola detrás.
+- **`icon`**: el `.exe` lleva el mismo icono que la ventana,
+  `sonora/static/img/sonora.ico` (lo genera `scripts/generar_icono.py`).
 
 ## Datos de usuario
 

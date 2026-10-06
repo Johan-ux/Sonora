@@ -204,3 +204,83 @@ class TestBuscar:
         assert canal["canal"] == "@artista"
         # El avatar llega sin esquema; se usa el más grande.
         assert canal["thumbnail"] == "https://yt3.ggpht.com/avatar=s176"
+
+
+class TestUrlDelResultado:
+    def test_prefiere_la_pagina_del_video_a_la_del_stream(self):
+        # Extracción completa con un único formato: 'url' es la dirección
+        # firmada del fichero, que caduca a las horas.
+        entrada = _video(
+            "dQw4w9WgXcQ",
+            url="https://rr3---sn-abc.googlevideo.com/videoplayback?expire=1790000000&sig=x",
+            webpage_url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        )
+        resultado = youtube._entrada_a_resultado(entrada)
+        assert resultado["url"] == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
+    def test_sin_pagina_usa_la_url_de_la_entrada(self):
+        assert youtube._entrada_a_resultado(_video("abc"))["url"].endswith("watch?v=abc")
+
+
+class TestClasificarUrls:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://www.youtube.com/playlist?list=PLabc",
+            "https://music.youtube.com/playlist?list=OLAK5uy",
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLabc&index=3",
+            "https://youtu.be/dQw4w9WgXcQ?list=PLabc",
+        ],
+    )
+    def test_es_una_lista(self, url):
+        assert youtube.es_url_playlist(url) is True
+        assert youtube.es_url_canal(url) is False
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            # La pestaña de listas de un canal es una página de canal.
+            "https://www.youtube.com/@canal/playlists",
+            "https://www.youtube.com/channel/UCabc/playlists",
+            "https://www.youtube.com/@canal",
+        ],
+    )
+    def test_es_un_canal(self, url):
+        assert youtube.es_url_playlist(url) is False
+        assert youtube.es_url_canal(url) is True
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            # Un parámetro que solo *acaba* en «list» no es el de la lista.
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ&playlist=1",
+            "dQw4w9WgXcQ",
+            "",
+        ],
+    )
+    def test_no_es_ni_lista_ni_canal(self, url):
+        assert youtube.es_url_playlist(url) is False
+        assert youtube.es_url_canal(url) is False
+
+    @pytest.mark.parametrize(
+        ("url", "esperado"),
+        [
+            ("https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=WL", "dQw4w9WgXcQ"),
+            ("https://youtu.be/dQw4w9WgXcQ?list=PLabc", "dQw4w9WgXcQ"),
+            ("https://www.youtube.com/playlist?list=PLabc", ""),
+            ("", ""),
+        ],
+    )
+    def test_id_del_video_que_trae_la_url(self, url, esperado):
+        assert youtube.id_video(url) == esperado
+
+
+class TestExpandirPestanaDeListas:
+    def test_las_listas_de_un_canal_no_salen_como_canciones(self, ydl_falso):
+        ydl_falso["entradas"] = [LISTA, _video("abc")]
+        _, items, _ = youtube.expandir_canal("https://www.youtube.com/@canal/playlists")
+        assert ydl_falso["url"] == "https://www.youtube.com/@canal/playlists"
+        assert [i["tipo"] for i in items] == ["lista", "video"]
+        # La lista conserva su URL para poder abrirla; no lleva id de vídeo.
+        assert items[0]["url"] == LISTA["url"] and items[0]["id"] == ""

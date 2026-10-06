@@ -26,12 +26,15 @@ def _globales(datos: dict) -> dict:
     Cada uno cae, si no viene en la petición, al valor persistido en config.
     Un ítem individual puede sobreescribir cualquiera de estos (override por
     resultado); estos son solo el punto de partida común del lote/petición.
+
+    La configuración se lee aquí, una vez por petición, y no al normalizar cada
+    ítem: con una playlist de mil canciones serían tres mil consultas.
     """
     return {
         "carpeta": ruta_relativa(datos, "carpeta"),
-        "bitrate": texto(datos, "bitrate"),
-        "formato": texto(datos, "formato"),
-        "resolucion": texto(datos, "resolucion"),
+        "bitrate": texto(datos, "bitrate") or descargas.bitrate_por_defecto(),
+        "formato": texto(datos, "formato") or descargas.formato_por_defecto(),
+        "resolucion": texto(datos, "resolucion") or descargas.resolucion_por_defecto(),
     }
 
 
@@ -44,11 +47,9 @@ def _item_desde(entrada: dict, globales: dict) -> dict:
     guarda su valor concreto en el momento de añadirse).
     """
     carpeta = ruta_relativa(entrada, "carpeta") or globales["carpeta"]
-    bitrate = texto(entrada, "bitrate") or globales["bitrate"] or descargas.bitrate_por_defecto()
-    formato = texto(entrada, "formato") or globales["formato"] or descargas.formato_por_defecto()
-    resolucion = (
-        texto(entrada, "resolucion") or globales["resolucion"] or descargas.resolucion_por_defecto()
-    )
+    bitrate = texto(entrada, "bitrate") or globales["bitrate"]
+    formato = texto(entrada, "formato") or globales["formato"]
+    resolucion = texto(entrada, "resolucion") or globales["resolucion"]
     return {
         "id": uuid.uuid4().hex[:10],
         "url": texto(entrada, "url"),
@@ -86,6 +87,7 @@ def agregar():
     # concurrentes con la misma URL no pueden duplicarla.
     if not db.cola_agregar_si_no_activa(item):
         return jsonify({"ok": True, "duplicado": True})
+    descargas.reponer_workers()
     descargas.emitir_cola_actualizada()
     return jsonify({"id": item["id"], "ok": True, "duplicado": False})
 
@@ -130,58 +132,50 @@ def agregar_playlist():
     if not validas:
         return jsonify({"ok": True, "lotes": 0, "total": 0, "omitidas": omitidas})
 
+    # Reparto en lotes: uno solo con nombre explícito (añadir un lote concreto
+    # desde el buscador) o varios de 'tam' canciones, nombrados «i/N».
     total = len(validas)
-    ids: list[str] = []
-    lotes_con_items = 0
+    if nombre_lote:
+        tramos = [(validas, nombre_lote)]
+    else:
+        try:
+            tam = int(datos.get("tamano_lote") or 100)
+        except (TypeError, ValueError):
+            tam = 100
+        tam = max(1, min(tam, MAX_TAMANO_LOTE))
+        n_lotes = (total + tam - 1) // tam
+        tramos = []
+        for indice_lote in range(n_lotes):
+            ini = indice_lote * tam
+            fin = min(ini + tam, total)
+            nombre = f"{titulo} · Lote {indice_lote + 1}/{n_lotes} (canciones {ini + 1}–{fin})"
+            tramos.append((validas[ini:fin], nombre))
 
-    def _agregar_lote(entradas_lote: list[dict], lote_id: str, lote_nombre: str) -> None:
-        nonlocal omitidas, lotes_con_items
-        insertados = 0
+    items: list[dict] = []
+    for entradas_lote, lote_nombre in tramos:
+        lote_id = uuid.uuid4().hex[:12]
         for entrada in entradas_lote:
             item = _item_desde(entrada, globales)
             item["lote"] = lote_id
             item["lote_nombre"] = lote_nombre
-            try:
-                # Atómico contra la cola activa: peticiones concurrentes (dos
-                # lotes a la vez, «Añadir todo» + un ＋ suelto…) no duplican.
-                if db.cola_agregar_si_no_activa(item):
-                    ids.append(item["id"])
-                    insertados += 1
-                else:
-                    omitidas += 1
-            except Exception:  # noqa: BLE001 - un ítem inválido no aborta el lote
-                continue
-        if insertados:
-            lotes_con_items += 1
+            items.append(item)
 
-    if nombre_lote:
-        # Un único lote con nombre explícito (añadir un lote concreto).
-        _agregar_lote(validas, uuid.uuid4().hex[:12], nombre_lote)
-        descargas.emitir_cola_actualizada()
-        return jsonify({
-            "ok": True,
-            "lotes": lotes_con_items,
-            "total": len(ids),
-            "omitidas": omitidas,
-        })
-
-    # Reparto automático en lotes de 'tam' canciones.
-    try:
-        tam = int(datos.get("tamano_lote") or 100)
-    except (TypeError, ValueError):
-        tam = 100
-    tam = max(1, min(tam, MAX_TAMANO_LOTE))
-
-    n_lotes = (total + tam - 1) // tam
-    for indice_lote in range(n_lotes):
-        ini = indice_lote * tam
-        fin = min(ini + tam, total)
-        lote_nombre = f"{titulo} · Lote {indice_lote + 1}/{n_lotes} (canciones {ini + 1}–{fin})"
-        _agregar_lote(validas[ini:fin], uuid.uuid4().hex[:12], lote_nombre)
-    descargas.emitir_cola_actualizada()
-    # 'lotes' cuenta solo los lotes que recibieron canciones de verdad: si todo
+    # Todo de una vez y atómico contra la cola activa: peticiones concurrentes
+    # (dos lotes a la vez, «Añadir todo» + un ＋ suelto…) no duplican.
+    insertados = set(db.cola_agregar_varios_si_no_activas(items))
+    omitidas += len(items) - len(insertados)
+    # 'lotes' cuenta solo los que recibieron canciones de verdad: si todo
     # estaba ya en la cola, la respuesta es {lotes: 0, total: 0, omitidas: N}.
-    return jsonify({"ok": True, "lotes": lotes_con_items, "total": len(ids), "omitidas": omitidas})
+    lotes_con_items = len({item["lote"] for item in items if item["id"] in insertados})
+    if insertados:
+        descargas.reponer_workers()
+    descargas.emitir_cola_actualizada()
+    return jsonify({
+        "ok": True,
+        "lotes": lotes_con_items,
+        "total": len(insertados),
+        "omitidas": omitidas,
+    })
 
 
 @bp.post("/api/cola/eliminar")
@@ -248,6 +242,10 @@ def reintentar():
         descargas.arrancar_worker()
     descargas.emitir_cola_actualizada()
     if not ok:
+        item = db.cola_obtener(item_id)
+        if item and item.get("estado") == "error":
+            # Sigue en error: no se reactivó porque su URL ya está en otro ítem.
+            return error_json("Esa canción ya está otra vez en la cola.", 409)
         return error_json("El ítem no está en estado de error.", 409)
     return jsonify({"ok": True})
 

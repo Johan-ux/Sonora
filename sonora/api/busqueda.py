@@ -26,21 +26,43 @@ def buscar():
     try:
         if youtube.es_url(q):
             if youtube.es_url_playlist(q):
-                titulo, items, total = youtube.expandir_playlist(q)
-                return jsonify({
-                    "resultados": items,
-                    "es_playlist": True,
-                    "es_canal": False,
-                    "es_mix": youtube.es_mix(q),
-                    "titulo_playlist": titulo,
-                    "total_playlist": total,      # total real según YouTube
-                    "obtenidas": len(items),      # cuántas se pudieron extraer
-                    "tope": len(items) >= youtube.MAX_PLAYLIST,  # se cortó en el tope
-                })
-            if youtube.es_url_canal(q):
+                # «Ver más tarde», «Me gusta» o una lista privada no se pueden
+                # abrir sin cuenta, pero una URL watch?v=X&list=Y trae además el
+                # vídeo que se estaba viendo: si la lista falla, se enseña ese.
+                con_video = bool(youtube.id_video(q))
+                try:
+                    titulo, items, total = youtube.expandir_playlist(q)
+                except Exception:
+                    if not con_video:
+                        raise
+                    items = []
+                if items or not con_video:
+                    return jsonify({
+                        "resultados": items,
+                        "es_playlist": True,
+                        "es_canal": False,
+                        "es_mix": youtube.es_mix(q),
+                        "titulo_playlist": titulo,
+                        "total_playlist": total,      # total real según YouTube
+                        "obtenidas": len(items),      # cuántas se pudieron extraer
+                        "tope": len(items) >= youtube.MAX_PLAYLIST,  # se cortó en el tope
+                    })
+            elif youtube.es_url_canal(q):
                 # Un canal se muestra como una "playlist" (por lotes, con ＋ por
                 # vídeo) para que el usuario ELIJA; nunca se descarga entero solo.
                 titulo, items, total = youtube.expandir_canal(q)
+                videos = [item for item in items if item["tipo"] == "video"]
+                if items and not videos:
+                    # La pestaña de listas del canal: son colecciones que abrir,
+                    # no canciones que repartir en lotes.
+                    return jsonify({
+                        "resultados": items,
+                        "es_playlist": False,
+                        "titulo_playlist": "",
+                    })
+                # Por lotes solo van los vídeos: «Añadir todo» no debe encolar
+                # una lista que se hubiera colado entre ellos.
+                items = videos
                 return jsonify({
                     "resultados": items,
                     "es_playlist": True,

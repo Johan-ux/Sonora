@@ -812,6 +812,13 @@ async function agregarPlaylist(btn, ini, fin) {
 
 function actualizarCola(items) {
   estado.cola = items || [];
+  reflejarColaFueraDeSuVista();
+  if (estado.vista === "cola") renderCola();
+}
+
+// Lo que depende de la cola fuera de su vista: qué URLs están ya en ella
+// (para los botones de añadir del buscador) y el contador del menú.
+function reflejarColaFueraDeSuVista() {
   estado.urlsActivas = new Set(
     estado.cola
       .filter((i) => i.estado === "en_cola" || i.estado === "descargando")
@@ -819,7 +826,43 @@ function actualizarCola(items) {
   );
   actualizarBadgeCola();
   actualizarBotonesAgregar();
-  if (estado.vista === "cola") renderCola();
+}
+
+// Cambio de UNA fila (una descarga empieza, termina o falla). Se sustituye
+// solo esa: repintar la lista entera en cada uno de esos cambios hace que una
+// playlist de mil canciones se dibuje dos mil veces.
+function actualizarItemCola(item) {
+  const indice = item ? estado.cola.findIndex((i) => i.id === item.id) : -1;
+  if (indice === -1) {
+    refrescarCola(); // no la conocemos: nos hemos perdido algo
+    return;
+  }
+  estado.cola[indice] = item;
+  reflejarColaFueraDeSuVista();
+  if (estado.vista !== "cola") return;
+  const fila = document.querySelector(
+    '#cola-lista .cola-item[data-id="' + CSS.escape(item.id) + '"]'
+  );
+  if (!fila) {
+    renderCola();
+    return;
+  }
+  pintarControlesCola();
+  fila.outerHTML = filaCola(item);
+  if (item.lote) pintarCabeceraLote(item.lote);
+}
+
+// Contador «hechas/total» de un lote y su botón de quitar las pendientes.
+function pintarCabeceraLote(lote) {
+  const det = document.querySelector(
+    '#cola-lista .lote-grupo[data-lote="' + CSS.escape(lote) + '"]'
+  );
+  if (!det) return;
+  const grupo = estado.cola.filter((i) => i.lote === lote);
+  det.querySelector(".lote-contador").textContent =
+    grupo.filter((g) => g.estado === "completado").length + "/" + grupo.length;
+  const quitar = det.querySelector(".lote-quitar");
+  if (quitar && !grupo.some((g) => g.estado === "en_cola")) quitar.remove();
 }
 
 function actualizarBadgeCola() {
@@ -897,11 +940,9 @@ function filaCola(item) {
   );
 }
 
-function renderCola() {
-  const lista = $("#cola-lista");
+// Botones globales y resumen de la cola (sin tocar la lista).
+function pintarControlesCola() {
   const items = estado.cola;
-
-  // Controles globales y resumen.
   const enCola = items.filter((i) => i.estado === "en_cola").length;
   const descargando = items.filter((i) => i.estado === "descargando").length;
   const errores = items.filter((i) => i.estado === "error").length;
@@ -920,6 +961,12 @@ function renderCola() {
   if (completadas) resumen.push(completadas + " completadas");
   if (errores) resumen.push(errores + " con error");
   $("#cola-resumen").textContent = resumen.join(" · ");
+}
+
+function renderCola() {
+  const lista = $("#cola-lista");
+  const items = estado.cola;
+  pintarControlesCola();
 
   if (!items.length) {
     lista.innerHTML =
@@ -974,32 +1021,7 @@ function renderCola() {
       "</details>";
   }
   lista.innerHTML = html;
-
-  // Listeners del render.
-  $$("#cola-lista .lote-grupo").forEach((det) => {
-    det.addEventListener("toggle", () => {
-      if (det.open) {
-        estado.lotesCerrados.delete(det.dataset.lote);
-      } else {
-        estado.lotesCerrados.add(det.dataset.lote);
-      }
-    });
-  });
-  $$("#cola-lista .ci-quitar").forEach((b) =>
-    b.addEventListener("click", () => quitarDeCola(b.dataset.id))
-  );
-  $$("#cola-lista .ci-cancelar").forEach((b) =>
-    b.addEventListener("click", () => cancelarDescarga(b.dataset.id, b))
-  );
-  $$("#cola-lista .ci-reintentar").forEach((b) =>
-    b.addEventListener("click", () => reintentar(b.dataset.id))
-  );
-  $$("#cola-lista .lote-quitar").forEach((b) =>
-    b.addEventListener("click", (e) => {
-      e.preventDefault(); // que el clic no pliegue/despliegue el details
-      quitarLote(b.dataset.lote);
-    })
-  );
+  // Los clics de las filas se atienden desde la propia lista (iniciarCola).
 }
 
 async function quitarDeCola(id) {
@@ -1043,6 +1065,34 @@ async function reintentar(id) {
 }
 
 function iniciarCola() {
+  // Un oyente para toda la lista en lugar de tres por fila: las filas se
+  // sustituyen sueltas o todas a la vez, y así no hay que volver a engancharlas.
+  const lista = $("#cola-lista");
+  lista.addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn || !lista.contains(btn)) return;
+    if (btn.classList.contains("ci-quitar")) {
+      quitarDeCola(btn.dataset.id);
+    } else if (btn.classList.contains("ci-cancelar")) {
+      cancelarDescarga(btn.dataset.id, btn);
+    } else if (btn.classList.contains("ci-reintentar")) {
+      reintentar(btn.dataset.id);
+    } else if (btn.classList.contains("lote-quitar")) {
+      e.preventDefault(); // que el clic no pliegue/despliegue el details
+      quitarLote(btn.dataset.lote);
+    }
+  });
+  // 'toggle' no burbujea: se escucha en la fase de captura.
+  lista.addEventListener("toggle", (e) => {
+    const det = e.target;
+    if (!(det instanceof HTMLDetailsElement) || !det.dataset.lote) return;
+    if (det.open) {
+      estado.lotesCerrados.delete(det.dataset.lote);
+    } else {
+      estado.lotesCerrados.add(det.dataset.lote);
+    }
+  }, true);
+
   $("#btn-descargar").addEventListener("click", async () => {
     try {
       await pedirJSON("/api/cola/descargar", { method: "POST" });
@@ -1112,6 +1162,9 @@ function iniciarSSE() {
       case "cola_actualizada":
         actualizarCola(datos.items || []);
         break;
+      case "item_actualizado":
+        actualizarItemCola(datos.item);
+        break;
       case "progreso": {
         // Actualización ligera: solo la barra y el chip del ítem en curso.
         const relleno = document.querySelector(
@@ -1122,9 +1175,9 @@ function iniciarSSE() {
           '[data-chip-id="' + CSS.escape(datos.id) + '"]'
         );
         if (chip) {
-          chip.textContent = datos.mensaje
-            ? "Convirtiendo…"
-            : Math.round(Number(datos.progreso) || 0) + " %";
+          // El backend dice qué está haciendo cuando no hay porcentaje que
+          // dar: «Convirtiendo…», «Procesando…», «Reintentando (2/3)…».
+          chip.textContent = datos.mensaje || Math.round(Number(datos.progreso) || 0) + " %";
         }
         break;
       }
@@ -1178,26 +1231,37 @@ async function cargarBiblioteca() {
   renderBiblioteca();
 }
 
+// Chips de carpeta: primero el camino hasta la carpeta abierta (para saber
+// dónde se está y poder subir), con la actual marcada; después, sus subcarpetas.
 function renderCarpetasBiblioteca() {
   const cont = $("#carpetas-biblioteca");
   const carpetas = estado.biblioteca.carpetas;
-  if (!carpetas.length && !estado.biblioteca.carpeta) {
+  const actual = estado.biblioteca.carpeta;
+  if (!carpetas.length && !actual) {
     cont.innerHTML = "";
     return;
   }
-  let html =
-    '<button type="button" class="chip-carpeta" data-carpeta="" aria-pressed="' +
-    (estado.biblioteca.carpeta === "" ? "true" : "false") + '">Toda la música</button>';
+  const chip = (ruta, nombre, marcada, icono) =>
+    '<button type="button" class="chip-carpeta" data-carpeta="' + esc(ruta) +
+    '" aria-pressed="' + (marcada ? "true" : "false") + '">' +
+    (icono ? ICONO.carpeta + " " : "") + esc(nombre) + "</button>";
+
+  let html = chip("", "Toda la música", actual === "", false);
+  const tramos = actual ? actual.split("/") : [];
+  tramos.forEach((nombre, i) => {
+    html += '<span class="carpeta-separador" aria-hidden="true">›</span>' +
+      chip(tramos.slice(0, i + 1).join("/"), nombre, i === tramos.length - 1, true);
+  });
+  if (tramos.length && carpetas.length) {
+    html += '<span class="carpeta-divisor" aria-hidden="true"></span>';
+  }
   for (const c of carpetas) {
-    html +=
-      '<button type="button" class="chip-carpeta" data-carpeta="' + esc(c) +
-      '" aria-pressed="' + (estado.biblioteca.carpeta === c ? "true" : "false") + '">' +
-      ICONO.carpeta + " " + esc(c.split("/").pop()) + "</button>";
+    html += chip(c, c.split("/").pop(), false, true);
   }
   cont.innerHTML = html;
-  $$("#carpetas-biblioteca .chip-carpeta").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      estado.biblioteca.carpeta = chip.dataset.carpeta;
+  $$("#carpetas-biblioteca .chip-carpeta").forEach((boton) => {
+    boton.addEventListener("click", () => {
+      estado.biblioteca.carpeta = boton.dataset.carpeta;
       cargarBiblioteca();
     });
   });
@@ -1271,21 +1335,24 @@ async function eliminarDeBiblioteca(archivo, titulo) {
     textoOk: "Eliminar",
   });
   if (!ok) return;
+  // Si es la pista que suena, se suelta ANTES de pedir el borrado: mientras el
+  // reproductor la tenga abierta, Windows no deja eliminar el fichero.
+  const sonaba = archivo === estado.rep.archivo;
+  if (sonaba) {
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    estado.rep.archivo = "";
+    estado.rep.indice = -1;
+    ocultarEscenarioVideo(false);
+    actualizarBarraReproductor(null);
+  }
   try {
     await pedirJSON("/api/biblioteca/eliminar", {
       method: "POST",
       body: JSON.stringify({ archivo: archivo }),
     });
-    // Si se borra la pista que suena, paramos y limpiamos la barra.
-    if (archivo === estado.rep.archivo) {
-      audio.pause();
-      audio.removeAttribute("src");
-      audio.load();
-      estado.rep.archivo = "";
-      estado.rep.indice = -1;
-      ocultarEscenarioVideo(false);
-      actualizarBarraReproductor(null);
-    } else {
+    if (!sonaba) {
       // Si sonaba otra pista, la quitamos de la cola de reproducción y
       // remapeamos el índice para que "siguiente/anterior" no salten a un hueco.
       const actual = estado.rep.archivo;
@@ -2622,6 +2689,13 @@ function abrirPreview(btn) {
     audio.pause();
   }
 
+  // Abrir otra vista previa encima no pasa por cerrarPreview(): hay que soltar
+  // aquí el reproductor propio de la anterior, o su flujo (y el ffmpeg que lo
+  // alimenta) seguiría vivo sin nadie mirando.
+  if (estado.video.previa && estado.video.previa.propia) {
+    estado.video.previa.propia.control.abort();
+  }
+
   estado.video.previa = {
     id: id,
     origen: btn,
@@ -2722,6 +2796,14 @@ function mensajeSalud(datos) {
   const yt = datos.yt_dlp || {};
   const runtime = datos.runtime_js || {};
 
+  if (datos.reinicio_pendiente) {
+    // Mientras no se reinicie, el servidor no deja buscar ni descargar.
+    return {
+      nivel: "aviso",
+      html: YTDLP + " se ha actualizado. Reinicia Sonora para seguir buscando y descargando.",
+      accion: false,
+    };
+  }
   if (!yt.instalada) {
     return { nivel: "error", html: "No se encontró " + YTDLP + ": las descargas no funcionarán.", accion: false };
   }
@@ -2788,11 +2870,12 @@ async function actualizarYtDlp() {
   try {
     const resultado = await pedirJSON("/api/salud/actualizar", { method: "POST" });
     avisar(resultado.mensaje || "yt-dlp actualizado.", "ok");
-    // Ya no hay nada que ofrecer: la actualización entra al reiniciar.
+    // Ya no hay nada que ofrecer: la actualización entra al reiniciar, y
+    // hasta entonces el servidor no deja buscar ni descargar.
     pintarSalud({
       nivel: "aviso",
       html: "yt-dlp actualizado a " + esc(resultado.version || "la última versión") +
-        ". Reinicia Sonora para usarlo.",
+        ". Reinicia Sonora para seguir buscando y descargando.",
       accion: false,
     });
   } catch (e) {
@@ -2814,12 +2897,28 @@ function iniciarSalud() {
 // marca la muestra elegida y se atiende el cambio.
 // ---------------------------------------------------------------------------
 
+// Cambia el color de la interfaz con un fundido corto de toda la página. Los
+// degradados no se pueden animar con una transición de CSS corriente; una
+// transición de vista funde la imagen de antes con la de después.
+function aplicarTema(tema) {
+  const raiz = document.documentElement;
+  const cambiar = () => {
+    raiz.dataset.tema = tema;
+  };
+  const sinMovimiento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (document.startViewTransition && !sinMovimiento) {
+    document.startViewTransition(cambiar);
+  } else {
+    cambiar();
+  }
+}
+
 function iniciarTemas() {
   const raiz = document.documentElement;
   $$('#temas input[name="tema"]').forEach((radio) => {
     radio.checked = radio.value === raiz.dataset.tema;
     radio.addEventListener("change", () => {
-      raiz.dataset.tema = radio.value;
+      aplicarTema(radio.value);
       guardarConfig({ tema: radio.value });
     });
   });

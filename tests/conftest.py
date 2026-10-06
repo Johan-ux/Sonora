@@ -118,3 +118,15 @@ def app(entorno):
 def client(app):
     """Test client HTTP de Flask."""
     return app.test_client()
+
+
+@pytest.fixture(autouse=True)
+def _sin_reinicio_pendiente(monkeypatch):
+    """Ningún test hereda el «falta reiniciar» que deja otro al actualizar yt-dlp.
+
+    Es estado global del módulo: sin esto, un test que actualice dejaría
+    cerradas las rutas de búsqueda y descarga para todos los que vengan detrás.
+    """
+    import sonora.salud
+
+    monkeypatch.setattr(sonora.salud, "_reinicio_pendiente", False)

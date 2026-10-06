@@ -78,7 +78,8 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    # icon='icono.ico',       # opcional: descomenta si añades un icono
+    # El mismo icono que usa la ventana (lo genera scripts/generar_icono.py).
+    icon=os.path.join(RAIZ, 'sonora', 'static', 'img', 'sonora.ico'),
 )
 
 coll = COLLECT(
