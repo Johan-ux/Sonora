@@ -13,7 +13,11 @@ bp = Blueprint("busqueda", __name__)
 
 @bp.post("/api/buscar")
 def buscar():
-    """Busca en YouTube por texto, o expande una URL de vídeo/playlist/canal."""
+    """Busca en YouTube por texto, o expande una URL de vídeo/playlist/canal.
+
+    Los ``filtros`` (orden, fecha, duración, tipo y características) solo se
+    aplican a la búsqueda por texto: una URL ya dice exactamente qué se quiere.
+    """
     datos = cuerpo_json()
     q = texto(datos, "q")
     n = datos.get("n", 12)
@@ -53,7 +57,7 @@ def buscar():
                 "es_playlist": False,
                 "titulo_playlist": "",
             })
-        resultados = youtube.buscar_ytsearch(q, n)
+        resultados = youtube.buscar(q, n, datos.get("filtros"))
         return jsonify({
             "resultados": resultados,
             "es_playlist": False,

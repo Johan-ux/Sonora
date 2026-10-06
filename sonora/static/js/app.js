@@ -93,6 +93,14 @@ function limitar(v, min, max) {
 function avisar(mensaje, tipo) {
   const cont = $("#avisos");
   if (!cont) return;
+  // El contenedor es un popover manual, abierto desde el arranque. Si después
+  // ha entrado algo más en la capa superior (un diálogo, la pantalla completa)
+  // lo taparía: se cierra y se vuelve a abrir para quedar encima.
+  if (cont.hasAttribute("popover")) {
+    const tapado = document.fullscreenElement || document.querySelector("dialog[open]");
+    if (tapado && cont.matches(":popover-open")) cont.hidePopover();
+    if (!cont.matches(":popover-open")) cont.showPopover();
+  }
   const el = document.createElement("div");
   el.className = "aviso" + (tipo ? " aviso-" + tipo : " aviso-info");
   const icono = document.createElement("span");
@@ -109,7 +117,7 @@ function avisar(mensaje, tipo) {
   }, 4200);
 }
 
-// Pinta el relleno ámbar de un input[type=range] (la pista usa var(--pct)).
+// Pinta el tramo recorrido de un input[type=range] (la pista usa var(--pct)).
 function pintarRango(input, pct) {
   input.style.setProperty("--pct", (isFinite(pct) ? pct : 0) + "%");
 }
@@ -145,6 +153,15 @@ const estado = {
   busqueda: {
     token: 0,                   // anti-carrera: solo pinta la respuesta más reciente
     datos: null,                // última respuesta renderizada
+    consulta: "",               // lo último que se buscó (texto o URL)
+    volverA: "",                // búsqueda desde la que se abrió una lista o un canal
+    filtros: {                  // filtros de la búsqueda por texto (ver iniciarFiltros)
+      orden: "relevancia",
+      fecha: "",
+      duracion: "",
+      tipo: "video",
+      caracteristicas: [],
+    },
   },
   biblioteca: {
     items: [],
@@ -237,6 +254,9 @@ async function cargarConfig() {
     estado.video.modo = cfg.video_modo === "teatro" ? "teatro" : "flotante";
     estado.video.geometria = cfg.video_geometria || null;
     reflejarEscenario();
+    // El orden de búsqueda es lo único de los filtros que se recuerda.
+    $("#filtro-orden").value = cfg.busqueda_orden || "relevancia";
+    estado.busqueda.filtros = leerFiltros();
     $("#select-bitrate").value = estado.bitrate;
     $("#select-resolucion").value = estado.resolucion;
     $("#select-simultaneas").value = String(estado.simultaneas);
@@ -306,15 +326,95 @@ function iniciarBuscador() {
     cambiarVista("buscar");
     buscar(q);
   });
+  iniciarFiltros();
+}
+
+// --------------------------- Filtros de búsqueda --------------------------- //
+//
+// Orden, fecha de subida, duración, tipo y características, como en YouTube.
+// Solo afectan a la búsqueda por texto: una URL pegada ya dice qué se quiere.
+// El orden se recuerda entre sesiones; lo demás dura lo que la app abierta.
+
+function esUrl(texto) {
+  return /^https?:\/\//i.test(texto);
+}
+
+// Lee los filtros tal y como están en el formulario.
+function leerFiltros() {
+  const datos = new FormData($("#filtros-busqueda"));
+  return {
+    orden: datos.get("orden") || "relevancia",
+    fecha: datos.get("fecha") || "",
+    duracion: datos.get("duracion") || "",
+    tipo: datos.get("tipo") || "video",
+    caracteristicas: datos.getAll("caracteristicas"),
+  };
+}
+
+// Indica si algo acota los resultados (el orden no cuenta: solo los recoloca).
+function hayFiltrosActivos() {
+  const f = estado.busqueda.filtros;
+  return Boolean(f.fecha || f.duracion || f.tipo !== "video" || f.caracteristicas.length);
+}
+
+function reflejarFiltros() {
+  const marcadas = estado.busqueda.filtros.caracteristicas.length;
+  const contador = $("#filtro-caracteristicas-n");
+  contador.textContent = String(marcadas);
+  contador.hidden = marcadas === 0;
+  $("#filtros-quitar").hidden = !hayFiltrosActivos();
+}
+
+// Vuelve a lanzar la última búsqueda por texto con los filtros de ahora.
+function repetirBusqueda() {
+  const q = estado.busqueda.consulta;
+  if (q && !esUrl(q)) buscar(q);
+}
+
+function iniciarFiltros() {
+  const form = $("#filtros-busqueda");
+  form.addEventListener("submit", (e) => e.preventDefault());
+  form.addEventListener("change", (e) => {
+    estado.busqueda.filtros = leerFiltros();
+    reflejarFiltros();
+    if (e.target.name === "orden") {
+      guardarConfig({ busqueda_orden: estado.busqueda.filtros.orden });
+    }
+    repetirBusqueda();
+  });
+  $("#filtros-quitar").addEventListener("click", () => {
+    // Quita lo que acota; el orden elegido se queda como está.
+    const orden = estado.busqueda.filtros.orden;
+    form.reset();
+    $("#filtro-orden").value = orden;
+    estado.busqueda.filtros = leerFiltros();
+    reflejarFiltros();
+    repetirBusqueda();
+  });
+  reflejarFiltros();
+}
+
+// Abre una lista o un canal encontrados en la búsqueda: se expanden buscando
+// por su URL (el camino de siempre), recordando de dónde se venía.
+function abrirColeccion(url) {
+  if (!esUrl(estado.busqueda.consulta)) estado.busqueda.volverA = estado.busqueda.consulta;
+  $("#campo-buscar").value = url;
+  buscar(url);
 }
 
 async function buscar(q) {
   const cont = $("#resultados");
   const token = ++estado.busqueda.token;
+  estado.busqueda.consulta = q;
+  // Tras una búsqueda por texto ya no hay adónde «volver»: los resultados son estos.
+  if (!esUrl(q)) estado.busqueda.volverA = "";
   cont.innerHTML = '<p class="cargando">Buscando…</p>';
   let datos;
   try {
-    datos = await pedirJSON("/api/buscar", { method: "POST", body: JSON.stringify({ q: q, n: 24 }) });
+    datos = await pedirJSON("/api/buscar", {
+      method: "POST",
+      body: JSON.stringify({ q: q, n: 24, filtros: estado.busqueda.filtros }),
+    });
   } catch (e) {
     if (token !== estado.busqueda.token) return; // llegó tarde: la descartamos
     cont.innerHTML = "";
@@ -331,39 +431,104 @@ async function buscar(q) {
   renderResultados(datos);
 }
 
+const _tiempoRelativo = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
+
+// Fecha de subida en palabras («hace 3 meses») a partir de la marca de tiempo
+// del resultado, que en las búsquedas es aproximada; '' si no se conoce.
+function haceCuanto(timestamp) {
+  if (!timestamp) return "";
+  const segundos = Date.now() / 1000 - timestamp;
+  const tramos = [["year", 31557600], ["month", 2629800], ["week", 604800], ["day", 86400]];
+  for (const [unidad, dura] of tramos) {
+    // Se redondea en vez de truncar: YouTube dice «hace 4 meses» y la cuenta
+    // de vuelta, con meses de 28 a 31 días, puede quedarse en 3,9.
+    if (segundos >= dura * 0.95) {
+      return _tiempoRelativo.format(-Math.round(segundos / dura), unidad);
+    }
+  }
+  return "hoy";
+}
+
 function tarjetaResultado(r) {
+  if (r.tipo === "lista" || r.tipo === "canal") return tarjetaColeccion(r);
   const conThumb = r.thumbnail
     ? '<img src="' + esc(r.thumbnail) + '" alt="" loading="lazy">'
     : "";
-  const duracion = r.duracion
-    ? '<span class="tarjeta-duracion">' + esc(r.duracion) + "</span>"
-    : "";
-  // Los atributos data-* se comparten entre el botón ＋ (añade con el formato
+  // Los atributos data-* se comparten entre el botón de añadir (usa el formato
   // global) y el ▾ (abre el menú para elegir audio o vídeo explícitamente).
   const datosItem =
     'data-url="' + esc(r.url) + '" data-titulo="' + esc(r.titulo) + '" ' +
     'data-thumbnail="' + esc(r.thumbnail) + '" data-duracion="' + esc(r.duracion) + '" ' +
     'data-canal="' + esc(r.canal) + '"';
-  // El botón de escucha va antes del grupo ＋/▾ en el DOM: cubre la portada
-  // entera y el CSS lo deja por debajo de ellos.
+  // Un directo en curso (o por empezar) se puede ver, pero no descargar: la
+  // tarjeta solo ofrece abrirlo en la ventana de vídeo.
+  if (r.directo === "en_vivo" || r.directo === "programado") {
+    const rotulo = r.directo === "en_vivo" ? "Ver en directo" : "Ver la sala de espera";
+    const boton = r.id
+      ? '<button type="button" class="tarjeta-abrir tarjeta-preview" data-preview-id="' +
+          esc(r.id) + '" data-directo="' + esc(r.directo) + '" ' + datosItem +
+          ' aria-label="' + rotulo + ": " + esc(r.titulo) + '">' + rotulo + "</button>"
+      : "";
+    return (
+      '<article class="tarjeta">' +
+        '<div class="tarjeta-cover' + (r.id ? " con-preview" : "") + '">' + conThumb + "</div>" +
+        '<h3 class="tarjeta-titulo">' + esc(r.titulo) + "</h3>" +
+        '<p class="tarjeta-canal">' + esc(r.canal) + "</p>" +
+        '<p class="tarjeta-meta">' +
+          (r.directo === "en_vivo"
+            ? '<span class="tarjeta-directo">En directo</span>'
+            : "<span>Programado</span>") +
+        "</p>" +
+        '<div class="tarjeta-acciones">' + boton + "</div>" +
+      "</article>"
+    );
+  }
+  // La portada va limpia, sin nada encima: las acciones están en el pie.
   const preview = r.id
-    ? '<button type="button" class="tarjeta-preview" data-preview-id="' + esc(r.id) + '" ' +
-        datosItem + ' aria-label="Escuchar antes de descargar: ' + esc(r.titulo) + '">' +
-        '<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.45)"/>' +
-        '<path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor"/></svg></button>'
+    ? '<button type="button" class="btn-icono tarjeta-preview" data-preview-id="' + esc(r.id) + '" ' +
+        datosItem + ' aria-label="Escuchar antes de descargar: ' + esc(r.titulo) + '"' +
+        ' title="Escuchar antes de descargar">' + ICONO.play + "</button>"
     : "";
+  // Un directo ya terminado es un vídeo más; solo se avisa de que lo fue.
+  const fecha = haceCuanto(r.timestamp);
+  const cuando = r.directo === "terminado" ? "emitido " + (fecha || "en directo") : fecha;
   return (
     '<article class="tarjeta">' +
-      '<div class="tarjeta-cover">' + conThumb + duracion + preview +
+      '<div class="tarjeta-cover' + (r.id ? " con-preview" : "") + '">' + conThumb + "</div>" +
+      '<h3 class="tarjeta-titulo">' + esc(r.titulo) + "</h3>" +
+      '<p class="tarjeta-canal">' + esc(r.canal) + "</p>" +
+      '<p class="tarjeta-meta">' +
+        '<span class="tarjeta-duracion">' + esc(r.duracion) + "</span>" +
+        "<span>" + esc(cuando) + "</span>" +
+      "</p>" +
+      '<div class="tarjeta-acciones">' + preview +
         '<div class="tarjeta-add-grupo">' +
           '<button type="button" class="tarjeta-add" ' + datosItem + ' ' +
-            'aria-label="Añadir a la cola: ' + esc(r.titulo) + '">＋</button>' +
+            'aria-label="Añadir a la cola: ' + esc(r.titulo) + '">＋ Añadir</button>' +
           '<button type="button" class="tarjeta-add-mas" ' + datosItem + ' ' +
             'aria-label="Elegir formato para: ' + esc(r.titulo) + '" aria-haspopup="menu">▾</button>' +
         "</div>" +
       "</div>" +
+    "</article>"
+  );
+}
+
+// Tarjeta de una lista o un canal: no se añaden a la cola tal cual, se abren.
+function tarjetaColeccion(r) {
+  const esCanal = r.tipo === "canal";
+  const conThumb = r.thumbnail
+    ? '<img src="' + esc(r.thumbnail) + '" alt="" loading="lazy">'
+    : "";
+  return (
+    '<article class="tarjeta tarjeta-coleccion' + (esCanal ? " es-canal" : "") + '">' +
+      '<div class="tarjeta-cover">' + conThumb + "</div>" +
       '<h3 class="tarjeta-titulo">' + esc(r.titulo) + "</h3>" +
       '<p class="tarjeta-canal">' + esc(r.canal) + "</p>" +
+      '<p class="tarjeta-meta"><span class="chip">' + (esCanal ? "Canal" : "Lista") + "</span></p>" +
+      '<div class="tarjeta-acciones">' +
+        '<button type="button" class="tarjeta-abrir" data-url="' + esc(r.url) + '">' +
+          (esCanal ? "Ver sus vídeos" : "Ver la lista") + "</button>" +
+      "</div>" +
     "</article>"
   );
 }
@@ -372,9 +537,13 @@ function renderResultados(datos) {
   const cont = $("#resultados");
   const resultados = datos.resultados || [];
   if (!resultados.length) {
+    const porFiltros = hayFiltrosActivos() && !esUrl(estado.busqueda.consulta);
     cont.innerHTML =
-      '<div class="estado-vacio"><h2>Sin resultados</h2>' +
-      "<p>Prueba con otro término o revisa la URL.</p></div>";
+      '<div class="estado-vacio"><h2>Sin resultados</h2><p>' +
+      (porFiltros
+        ? "Nada coincide con estos filtros. Prueba a quitar alguno."
+        : "Prueba con otro término o revisa la URL.") +
+      "</p></div>";
     return;
   }
 
@@ -384,9 +553,13 @@ function renderResultados(datos) {
     const titulo = datos.titulo_playlist || (datos.es_canal ? "Canal" : "Playlist");
     const total = datos.total_playlist || resultados.length;
     const obtenidas = datos.obtenidas || resultados.length;
+    if (estado.busqueda.volverA) {
+      html += '<p class="playlist-volver"><button type="button" class="btn btn-fantasma" ' +
+        'id="btn-volver-resultados">Volver a los resultados</button></p>';
+    }
     html += '<header class="playlist-cabecera">';
     html += "<h2>" + esc(titulo) + "</h2>";
-    html += '<span class="chip chip-ambar">' + (datos.es_canal ? "Canal" : datos.es_mix ? "Mix" : "Playlist") + "</span>";
+    html += '<span class="chip chip-acento">' + (datos.es_canal ? "Canal" : datos.es_mix ? "Mix" : "Playlist") + "</span>";
     html += '<span class="chip">' + obtenidas + " canciones</span>";
     html += "</header>";
 
@@ -404,7 +577,7 @@ function renderResultados(datos) {
 
     html += '<div class="playlist-acciones">';
     html +=
-      '<button type="button" class="btn btn-ambar" id="btn-agregar-todo" data-titulo="' +
+      '<button type="button" class="btn btn-acento" id="btn-agregar-todo" data-titulo="' +
       esc(titulo) + '">＋ Añadir todo (' + resultados.length + ")</button>";
     html += "</div>";
 
@@ -439,6 +612,25 @@ function renderResultados(datos) {
   $$("#resultados .tarjeta-preview").forEach((btn) => {
     btn.addEventListener("click", () => abrirPreview(btn));
   });
+  // La portada también abre la vista previa, pero solo como atajo de ratón:
+  // el control de verdad (con foco y nombre) es el botón ▶ del pie.
+  $$("#resultados .tarjeta-cover.con-preview").forEach((portada) => {
+    portada.addEventListener("click", () => {
+      const btn = portada.closest(".tarjeta").querySelector(".tarjeta-preview");
+      if (btn) abrirPreview(btn);
+    });
+  });
+  $$("#resultados .tarjeta-coleccion .tarjeta-abrir").forEach((btn) => {
+    btn.addEventListener("click", () => abrirColeccion(btn.dataset.url));
+  });
+  const btnVolver = $("#btn-volver-resultados");
+  if (btnVolver) {
+    btnVolver.addEventListener("click", () => {
+      const q = estado.busqueda.volverA;
+      $("#campo-buscar").value = q;
+      buscar(q);
+    });
+  }
   $$("#resultados .tarjeta-add-mas").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -463,7 +655,7 @@ function actualizarBotonesAgregar() {
   $$("#resultados .tarjeta-add").forEach((btn) => {
     const enCola = estado.urlsActivas.has(btn.dataset.url);
     btn.disabled = enCola;
-    btn.textContent = enCola ? "✓" : "＋";
+    btn.textContent = enCola ? "✓ En la cola" : "＋ Añadir";
     // La etiqueta accesible debe reflejar el estado en AMBOS sentidos: al
     // re-habilitarse (descarga terminada) recupera su etiqueta original.
     btn.setAttribute(
@@ -498,7 +690,7 @@ async function agregarUno(btn, formato) {
     } else {
       avisar(fmt === "video" ? "Vídeo añadido a la cola." : "Añadida a la cola.", "ok");
     }
-    btn.textContent = "✓";
+    btn.textContent = "✓ En la cola";
   } catch (e) {
     btn.disabled = false;
     avisar("No se pudo añadir: " + e.message, "error");
@@ -556,11 +748,15 @@ function abrirMenuFormato(btnMas) {
       agregarUno(btnAdd, b.dataset.formato);
     });
   });
-  // Posición: bajo el botón ▾, sin salirse por la derecha de la ventana.
+  // Posición: bajo el botón ▾ y alineado con su borde derecho, pero sin salirse
+  // de la tarjeta por la izquierda (en la primera columna pisaría la barra
+  // lateral) ni de la ventana por la derecha.
   menu.classList.add("abierto");
   const r = btnMas.getBoundingClientRect();
   const ancho = menu.offsetWidth;
-  const izq = Math.max(8, Math.min(r.right - ancho, window.innerWidth - ancho - 8));
+  const tarjeta = btnMas.closest(".tarjeta");
+  const tope = tarjeta ? tarjeta.getBoundingClientRect().left : 8;
+  const izq = limitar(Math.max(r.right - ancho, tope), 8, window.innerWidth - ancho - 8);
   menu.style.left = izq + "px";
   menu.style.top = (r.bottom + 6) + "px";
 }
@@ -638,7 +834,7 @@ function actualizarBadgeCola() {
 function chipEstado(item) {
   if (item.estado === "descargando") {
     const pct = Math.round(Number(item.progreso) || 0);
-    return '<span class="chip chip-ambar ci-estado" data-chip-id="' + esc(item.id) + '">' + pct + " %</span>";
+    return '<span class="chip chip-acento ci-estado" data-chip-id="' + esc(item.id) + '">' + pct + " %</span>";
   }
   if (item.estado === "completado") {
     return '<span class="chip chip-ok ci-estado">Completada</span>';
@@ -1473,7 +1669,9 @@ function despertarControlesVideo() {
   if (audio.paused || estado.video.previa) return;
   temporizadorControlesVideo = setTimeout(() => {
     const enUso = estado.rep.arrastrandoSeek ||
-      escenario.querySelector(":focus-visible, .ev-controles:hover, .ev-barra:hover");
+      escenario.querySelector(
+        ":focus-visible, select:open, .ev-controles:hover, .ev-barra:hover"
+      );
     if (enUso) {
       despertarControlesVideo();
     } else {
@@ -1781,13 +1979,34 @@ function iniciarEscenarioVideo() {
     if (e.target === video || e.target === marco) alternarPantallaCompleta();
   });
 
+  // El reproductor de YouTube de la vista previa trae su propio botón de
+  // pantalla completa. Pulsado con la de la app ya puesta, el navegador apila
+  // una sobre otra y de la de YouTube ya no se sale con su botón. Quien lo
+  // pulsa ahí lo que quiere es alternar, así que se deshacen las dos.
+  let completoAntes = null;
+  let saliendoDelTodo = false;
+
   // Al entrar o salir de pantalla completa (también la del reproductor de la
   // vista previa) la ventana de la app tiene que acompañar: WebView2 solo
   // agranda el elemento hasta el borde de la ventana (ver escritorio.py).
   document.addEventListener("fullscreenchange", () => {
+    const ahora = document.fullscreenElement;
+    if (completoAntes === escenario && ahora && ahora !== escenario) saliendoDelTodo = true;
+    completoAntes = ahora;
+    if (saliendoDelTodo) {
+      if (ahora) {
+        // Cada llamada deshace un nivel; el siguiente aviso trae el de debajo.
+        document.exitFullscreen().catch(() => {
+          saliendoDelTodo = false;
+          reflejarEscenario();
+        });
+        return;
+      }
+      saliendoDelTodo = false;
+    }
     const api = window.pywebview && window.pywebview.api;
     if (api && typeof api.pantalla_completa === "function") {
-      const aviso = api.pantalla_completa(Boolean(document.fullscreenElement));
+      const aviso = api.pantalla_completa(Boolean(ahora));
       if (aviso && aviso.catch) aviso.catch(() => {});
     }
     reflejarEscenario();
@@ -2094,9 +2313,9 @@ function confirmar(opciones) {
     $("#conf-mensaje").textContent = opts.mensaje || "";
     const btnOk = $("#conf-ok");
     btnOk.textContent = opts.textoOk || "Aceptar";
-    // Rojo para acciones destructivas, ámbar para el resto.
+    // Rojo para acciones destructivas, el acento para el resto.
     btnOk.classList.toggle("btn-peligro", opts.peligro !== false);
-    btnOk.classList.toggle("btn-ambar", opts.peligro === false);
+    btnOk.classList.toggle("btn-acento", opts.peligro === false);
     function alCerrar() {
       dlg.removeEventListener("close", alCerrar);
       // <form method="dialog">: el botón pulsado fija returnValue con su value.
@@ -2209,6 +2428,188 @@ function iniciarDialogoCarpetas() {
 // Campos que la tarjeta lleva en sus data-* y que necesita agregarUno().
 const CAMPOS_ITEM = ["url", "titulo", "thumbnail", "duracion", "canal"];
 
+const ORIGEN_YOUTUBE = "https://www.youtube-nocookie.com";
+
+// Pide al reproductor incrustado que cuente lo que le pasa. Es el protocolo de
+// la API de iframes de YouTube: hasta que no se le saluda no manda nada, y como
+// al cargar el iframe puede no estar listo aún, se insiste unos segundos.
+function escucharAYoutube(iframe) {
+  const saludo = JSON.stringify({ event: "listening", id: "sonora", channel: "widget" });
+  let intentos = 0;
+  const insistir = setInterval(() => {
+    intentos += 1;
+    if (!iframe.isConnected || intentos > 20) {
+      clearInterval(insistir);
+      return;
+    }
+    if (iframe.contentWindow) iframe.contentWindow.postMessage(saludo, ORIGEN_YOUTUBE);
+  }, 400);
+}
+
+// YouTube se niega a reproducir el vídeo en su reproductor incrustado. Pasa
+// con vídeos públicos y descargables («Este vídeo no está disponible / Ver en
+// YouTube») y no depende de la app. Se pasa entonces a un <video> propio que
+// el backend alimenta uniendo audio y vídeo al vuelo (servicios/previa.py).
+async function alFallarYoutube() {
+  const previa = estado.video.previa;
+  if (!previa || previa.propia) return;
+  previa.propia = { base: 0, duracion: 0, control: new AbortController() };
+  if (previa.directo) {
+    // Un directo en curso no se puede servir desde aquí.
+    previaNoDisponible("YouTube no deja ver este directo fuera de su web.");
+    return;
+  }
+  $("#ev-previa").innerHTML = '<div class="ev-espera"></div>';
+  let info;
+  try {
+    info = await pedirJSON("/api/previa/" + encodeURIComponent(previa.id));
+  } catch (e) {
+    if (estado.video.previa === previa) {
+      previaNoDisponible("YouTube no deja ver este vídeo fuera de su web, " +
+        "y tampoco se ha podido reproducir desde Sonora.");
+    }
+    return;
+  }
+  // Mientras se preparaba, la vista previa pudo cerrarse o cambiar de vídeo.
+  if (estado.video.previa !== previa) return;
+  previa.propia.duracion = info.duracion || 0;
+  montarPreviaPropia(previa);
+  avisar("YouTube no deja incrustar este vídeo: se reproduce con el reproductor de Sonora.", "info");
+}
+
+// Reproductor propio de la vista previa: lo justo (pausa, posición y tiempo).
+// El volumen es el de la barra de reproducción de la app.
+function montarPreviaPropia(previa) {
+  const propia = previa.propia;
+  const marco = $("#ev-previa");
+  marco.innerHTML =
+    '<video class="previa-video" playsinline></video>' +
+    '<div class="ev-espera"></div>' +
+    '<div class="previa-controles">' +
+      '<button type="button" class="btn-icono" id="previa-play" aria-label="Pausar">' +
+        ICONO.pausa + "</button>" +
+      '<input type="range" id="previa-seek" min="0" step="1" value="0" ' +
+        'max="' + Math.max(1, Math.floor(propia.duracion)) + '" aria-label="Posición del vídeo">' +
+      '<span class="ev-tiempo" id="previa-tiempo"></span>' +
+    "</div>";
+  const video = marco.querySelector("video");
+  const espera = marco.querySelector(".ev-espera");
+  const seek = $("#previa-seek");
+  const btnPlay = $("#previa-play");
+  let arrastrando = false;
+
+  function pintar(segundos) {
+    seek.value = String(segundos);
+    pintarRango(seek, propia.duracion ? (segundos / propia.duracion) * 100 : 0);
+    $("#previa-tiempo").textContent =
+      formatearTiempo(segundos) + " / " + formatearTiempo(propia.duracion);
+  }
+
+  // El flujo se escribe sobre la marcha y no admite saltos: para ir a otro
+  // punto se pide uno nuevo desde ese segundo. La posición real es, por tanto,
+  // ese arranque más lo que lleve reproducido el <video>.
+  function irA(segundos) {
+    propia.base = limitar(segundos, 0, Math.max(0, propia.duracion - 1));
+    espera.hidden = false;
+    video.src = "/previa/" + encodeURIComponent(previa.id) + ".mp4?t=" + propia.base;
+    const p = video.play();
+    if (p && p.catch) p.catch(() => {});
+    pintar(propia.base);
+  }
+
+  function alternar() {
+    if (video.paused) {
+      const p = video.play();
+      if (p && p.catch) p.catch(() => {});
+    } else {
+      video.pause();
+    }
+  }
+
+  const igualarVolumen = () => {
+    video.volume = audio.volume;
+    video.muted = audio.muted;
+  };
+  igualarVolumen();
+  // La señal quita este oyente al cerrar la vista previa (ver cerrarPreview).
+  audio.addEventListener("volumechange", igualarVolumen, { signal: propia.control.signal });
+  // Y al cerrarla hay que soltar el flujo a propósito: quitar el <video> de la
+  // página no corta la conexión, y ffmpeg seguiría bajando el vídeo para nadie.
+  propia.control.signal.addEventListener("abort", () => {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+  });
+
+  video.addEventListener("timeupdate", () => {
+    if (!arrastrando) pintar(propia.base + video.currentTime);
+  });
+  video.addEventListener("waiting", () => {
+    espera.hidden = false;
+  });
+  for (const tipo of ["playing", "canplay"]) {
+    video.addEventListener(tipo, () => {
+      espera.hidden = true;
+    });
+  }
+  for (const tipo of ["play", "pause"]) {
+    video.addEventListener(tipo, () => {
+      btnPlay.innerHTML = video.paused ? ICONO.play : ICONO.pausa;
+      btnPlay.setAttribute("aria-label", video.paused ? "Reproducir" : "Pausar");
+    });
+  }
+  video.addEventListener("loadedmetadata", () => {
+    if (video.videoWidth && video.videoHeight) {
+      fijarProporcionVideo(video.videoWidth / video.videoHeight);
+    }
+  });
+  video.addEventListener("error", () => {
+    if (estado.video.previa === previa) {
+      previaNoDisponible("No se ha podido reproducir este vídeo desde Sonora.");
+    }
+  });
+  video.addEventListener("click", alternar);
+  btnPlay.addEventListener("click", alternar);
+
+  seek.addEventListener("pointerdown", () => {
+    arrastrando = true;
+  });
+  for (const tipo of ["pointerup", "pointercancel"]) {
+    seek.addEventListener(tipo, () => {
+      arrastrando = false;
+    });
+  }
+  seek.addEventListener("input", () => {
+    pintar(Number(seek.value));
+  });
+  seek.addEventListener("change", () => {
+    arrastrando = false;
+    irA(Number(seek.value));
+  });
+
+  irA(0);
+}
+
+// Ni YouTube ni Sonora pueden con el vídeo: se dice, y se ofrece abrirlo fuera.
+function previaNoDisponible(mensaje) {
+  const previa = estado.video.previa;
+  const marco = $("#ev-previa");
+  marco.innerHTML =
+    '<div class="previa-aviso"><p></p>' +
+    '<button type="button" class="btn btn-fantasma">Abrir en YouTube</button></div>';
+  marco.querySelector("p").textContent = mensaje;
+  marco.querySelector("button").addEventListener("click", async () => {
+    try {
+      await pedirJSON("/api/abrir-youtube", {
+        method: "POST",
+        body: JSON.stringify({ id: previa.id }),
+      });
+    } catch (e) {
+      avisar("No se pudo abrir YouTube: " + e.message, "error");
+    }
+  });
+}
+
 function abrirPreview(btn) {
   const id = btn.dataset.previewId;
   if (!id) return;
@@ -2221,19 +2622,29 @@ function abrirPreview(btn) {
     audio.pause();
   }
 
-  estado.video.previa = { id: id, origen: btn };
+  estado.video.previa = {
+    id: id,
+    origen: btn,
+    directo: btn.dataset.directo || "",
+    propia: null, // estado del reproductor propio, si YouTube no deja incrustar
+  };
   $("#ev-titulo").textContent = btn.dataset.titulo || "Vista previa";
   $("#preview-canal").textContent = btn.dataset.canal || "";
 
   const iframe = document.createElement("iframe");
-  iframe.src = "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(id) +
-    "?autoplay=1&rel=0";
+  // enablejsapi y origin: para que el reproductor avise si no puede con el
+  // vídeo (ver escucharAYoutube y alFallarYoutube). La resolución no se le
+  // puede pedir: ignora setPlaybackQuality y setPlaybackQualityRange, y la
+  // elige él según el tamaño del marco (480p en pequeño, 1080p en teatro).
+  iframe.src = ORIGEN_YOUTUBE + "/embed/" + encodeURIComponent(id) +
+    "?autoplay=1&rel=0&enablejsapi=1&origin=" + encodeURIComponent(location.origin);
   iframe.title = "Reproductor de " + (btn.dataset.titulo || "YouTube");
   iframe.allow = "autoplay; encrypted-media; picture-in-picture";
   iframe.allowFullscreen = true;
   const marco = $("#ev-previa");
   marco.innerHTML = "";
   marco.appendChild(iframe);
+  escucharAYoutube(iframe);
 
   // El botón del pie se prepara como si fuera el ＋ de la tarjeta, así añadir
   // desde aquí pasa por el mismo agregarUno() y hereda su manejo de
@@ -2243,6 +2654,8 @@ function abrirPreview(btn) {
   const yaEsta = estado.urlsActivas.has(btn.dataset.url);
   btnAnadir.disabled = yaEsta;
   btnAnadir.textContent = yaEsta ? "✓ Ya está en la cola" : "＋ Añadir a la cola";
+  // Un directo se ve, pero no se puede poner a descargar hasta que acabe.
+  btnAnadir.hidden = Boolean(btn.dataset.directo);
 
   escenario.hidden = false;
   fijarProporcionVideo(16 / 9); // el reproductor de YouTube es siempre apaisado
@@ -2259,7 +2672,8 @@ function cerrarPreview() {
   if (document.fullscreenElement) document.exitFullscreen();
   const teniaElFoco = escenario.contains(document.activeElement);
   estado.video.previa = null;
-  // Vaciar el marco destruye el iframe y corta el sonido.
+  if (previa.propia) previa.propia.control.abort();
+  // Vaciar el marco destruye el iframe (o el <video> propio) y corta el sonido.
   $("#ev-previa").innerHTML = "";
   escenario.hidden = true;
   reflejarEscenario();
@@ -2269,6 +2683,20 @@ function cerrarPreview() {
 
 function iniciarPreview() {
   $("#btn-preview-cerrar").addEventListener("click", cerrarPreview);
+  // El reproductor de YouTube cuenta por postMessage si no puede con el vídeo.
+  // Solo se atiende al iframe de la vista previa que está abierta.
+  window.addEventListener("message", (e) => {
+    const iframe = $("#ev-previa iframe");
+    if (!estado.video.previa || !iframe) return;
+    if (e.origin !== ORIGEN_YOUTUBE || e.source !== iframe.contentWindow) return;
+    let datos;
+    try {
+      datos = JSON.parse(e.data);
+    } catch (err) {
+      return;
+    }
+    if (datos && datos.event === "onError") alFallarYoutube();
+  });
   $("#btn-preview-descargar").addEventListener("click", async (e) => {
     const boton = e.currentTarget;
     if (!boton.dataset.url) return;
@@ -2379,10 +2807,32 @@ function iniciarSalud() {
 }
 
 // ---------------------------------------------------------------------------
+// Tema de color (el degradado de acento sobre la paleta de negros)
+//
+// El tema guardado llega ya aplicado desde el servidor en <html data-tema>,
+// para que la ventana no abra con un color y salte a otro. Aquí solo se
+// marca la muestra elegida y se atiende el cambio.
+// ---------------------------------------------------------------------------
+
+function iniciarTemas() {
+  const raiz = document.documentElement;
+  $$('#temas input[name="tema"]').forEach((radio) => {
+    radio.checked = radio.value === raiz.dataset.tema;
+    radio.addEventListener("change", () => {
+      raiz.dataset.tema = radio.value;
+      guardarConfig({ tema: radio.value });
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Arranque
 // ---------------------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", () => {
+  // La región de avisos se abre ya y se queda abierta (ver avisar()).
+  const avisos = $("#avisos");
+  if (avisos.hasAttribute("popover")) avisos.showPopover();
   iniciarNavegacion();
   iniciarBuscador();
   iniciarConfig();
@@ -2393,6 +2843,7 @@ document.addEventListener("DOMContentLoaded", () => {
   iniciarDialogoCarpetas();
   iniciarPreview();
   iniciarSalud();
+  iniciarTemas();
   cargarConfig();
   comprobarSalud();
   refrescarCola();

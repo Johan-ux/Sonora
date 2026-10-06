@@ -68,13 +68,17 @@ requirements-dev.txt       Dependencias de desarrollo (pytest)
 - **Las preferencias de la interfaz se guardan en el backend**, no en el
   `localStorage` del navegador: la ventana usa un perfil privado y el puerto
   cambia en cada arranque, así que lo que guarde la página no sobrevive al
-  cierre. El volumen y la posición, tamaño y modo de la ventana de vídeo pasan
-  por `/api/config` como el resto de la configuración.
+  cierre. El volumen, el tema de color y la posición, tamaño y modo de la
+  ventana de vídeo pasan por `/api/config` como el resto de la configuración.
+  El tema, además, va ya puesto en el HTML que sirve `/` (`<html data-tema>`)
+  para que la ventana no abra con un color y salte a otro.
 - **La pantalla completa la pone la ventana, no la página.** WebView2 solo
   estira el elemento hasta el borde de la ventana; `escritorio.py` expone
   `pantalla_completa()` a la interfaz, que la llama en cada `fullscreenchange`
   para que la ventana ocupe de verdad el monitor (también con el reproductor de
-  la vista previa).
+  la vista previa). Al salir, pywebview deja siempre la ventana en tamaño
+  normal: si estaba maximizada, el puente la restaura antes de entrar y la
+  vuelve a maximizar al salir, para que quede como estaba.
 
 ## Tests y CI
 

@@ -27,6 +27,8 @@ ANCHO_VENTANA = 1200
 ALTO_VENTANA = 780
 ANCHO_MINIMO = 940
 ALTO_MINIMO = 600
+# Fondo de la ventana antes de que cargue la página (--fondo-0 en estilo.css).
+COLOR_FONDO = "#000000"
 
 # Host fijo: solo accesible localmente.
 HOST = "127.0.0.1"
@@ -104,6 +106,16 @@ def reportar_error(mensaje: str) -> None:
             pass
 
 
+def esta_maximizada(ventana) -> bool:
+    """Indica si la ventana está maximizada.
+
+    pywebview no lo cuenta: se le pregunta a la ventana nativa, que en Windows
+    es un formulario de WinForms. En otra plataforma no se sabe y se dice que no.
+    """
+    estado = getattr(getattr(ventana, "native", None), "WindowState", None)
+    return str(estado) == "Maximized"
+
+
 def crear_puente_pantalla_completa(ventana):
     """Devuelve la función que la interfaz llama al entrar o salir de pantalla completa.
 
@@ -114,16 +126,31 @@ def crear_puente_pantalla_completa(ventana):
 
     ``ventana.toggle_fullscreen()`` solo sabe alternar, así que el estado se
     lleva aquí para que dos avisos iguales seguidos no lo desparejen.
+
+    Al salir, pywebview deja la ventana en tamaño normal aunque estuviera
+    maximizada, y con las medidas que tenía al entrar: quedaría sin maximizar y
+    del tamaño de la pantalla. Por eso una ventana maximizada se restaura antes
+    de entrar (así lo que pywebview recuerda es su tamaño normal de verdad) y
+    se vuelve a maximizar al salir.
     """
     cerrojo = threading.Lock()
-    estado = {"completa": False}
+    estado = {"completa": False, "maximizada": False}
 
     def pantalla_completa(activar) -> bool:
         activar = bool(activar)
         with cerrojo:
-            if activar != estado["completa"]:
-                estado["completa"] = activar
+            if activar == estado["completa"]:
+                return activar
+            estado["completa"] = activar
+            if activar:
+                estado["maximizada"] = esta_maximizada(ventana)
+                if estado["maximizada"]:
+                    ventana.restore()
                 ventana.toggle_fullscreen()
+            else:
+                ventana.toggle_fullscreen()
+                if estado["maximizada"]:
+                    ventana.maximize()
         return activar
 
     return pantalla_completa
@@ -192,6 +219,9 @@ def main() -> int:
         width=ANCHO_VENTANA,
         height=ALTO_VENTANA,
         min_size=(ANCHO_MINIMO, ALTO_MINIMO),
+        # El negro de la interfaz desde el primer instante: sin esto la ventana
+        # abre en blanco hasta que carga la página.
+        background_color=COLOR_FONDO,
     )
     # Disponible en la interfaz como ``pywebview.api.pantalla_completa(bool)``.
     ventana.expose(crear_puente_pantalla_completa(ventana))

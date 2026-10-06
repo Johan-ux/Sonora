@@ -20,9 +20,10 @@ por completo.
 
 ## De un vistazo
 
-- **Buscar**: escribe y pulsa Enter (o pega una URL). Pulsa **＋** en cualquier
-  resultado para añadirlo a la cola; con playlists puedes añadir **todo** o por
-  **lotes de 100**.
+- **Buscar**: escribe y pulsa Enter (o pega una URL). Cada resultado lleva al
+  pie su botón **＋ Añadir** para ponerlo en la cola; con playlists puedes
+  añadir **todo** o por **lotes de 100**. Encima de los resultados están los
+  [filtros](#filtros-de-búsqueda).
 - **Descargas**: elige carpeta de destino y calidad (se recuerdan) y pulsa
   **Descargar todo**. Puedes cancelar la descarga en curso, quitar pendientes
   y reintentar las fallidas.
@@ -31,11 +32,86 @@ por completo.
   dentro de la app (ver [Ver vídeos](#ver-vídeos)).
 - **Historial**: consulta lo descargado anteriormente.
 
+## Color de la interfaz
+
+Sonora es negra, con un único acento en degradado. Al pie de la barra lateral
+hay una muestra por cada uno; el cambio es inmediato y se recuerda para la
+próxima vez.
+
+| Tema           | Degradado                       |
+| -------------- | ------------------------------- |
+| **Ocaso**      | rosa a naranja (el de fábrica)  |
+| **Cobre**      | naranja a oro                   |
+| **Duna**       | arena a oro viejo               |
+| **Agave**      | lima a verde menta              |
+| **Turquesa**   | turquesa a menta                |
+| **Oasis**      | azul a cian                     |
+| **Crepúsculo** | violeta (`#A238FF`) a azul añil |
+| **Buganvilla** | violeta (`#A238FF`) a magenta   |
+| **Luna**       | blanco a gris azulado           |
+
+El degradado se usa con cuentagotas —el botón principal, lo que está sonando,
+las barras de progreso— y en la línea que corona la barra de reproducción, que
+se ilumina mientras suena algo. Para que la app no se vea tan negra, el mismo
+degradado entra además como un resplandor amplio por la esquina superior
+derecha y se va apagando hacia el centro.
+
+## Filtros de búsqueda
+
+Sobre los resultados hay una fila de filtros como los de YouTube. Cambiar
+cualquiera repite la búsqueda al momento, y **Quitar filtros** los limpia.
+
+| Filtro              | Opciones                                                |
+| ------------------- | ------------------------------------------------------- |
+| **Orden**           | Relevancia, Más recientes, Popularidad                  |
+| **Fecha de subida** | Hoy, esta semana, este mes, este año                    |
+| **Duración**        | Menos de 4 minutos, de 4 a 20, más de 20                |
+| **Tipo**            | Vídeos, listas, canales                                 |
+| **Características** | En directo, 4K, HD, HDR, subtítulos, Creative Commons, 360°, VR180, 3D |
+
+El **orden** elegido se recuerda para la próxima vez; el resto de filtros solo
+duran mientras la app está abierta. Los filtros se aplican a las búsquedas por
+texto: una URL pegada se abre tal cual.
+
+**Más recientes** merece una aclaración: YouTube ya no ordena por fecha de
+subida (su filtro actual solo ofrece relevancia y popularidad), así que Sonora
+pide más resultados de los que enseña y los ordena ella misma por la fecha
+aproximada que da YouTube («hace 3 meses»). El resultado es lo más nuevo
+*entre lo más relevante*, no lo último subido en todo YouTube. Para acotar de
+verdad, combínalo con **Fecha de subida**.
+
+Al elegir **Listas** o **Canales**, cada resultado se abre con su botón (**Ver
+la lista**, **Ver sus vídeos**) y desde ahí se añade como cualquier playlist;
+**Volver a los resultados** deshace el camino.
+
+Faltan a propósito algunos filtros de YouTube: **Películas** (son de pago),
+**Shorts** (YouTube no lo admite por esta vía) y **Ubicación** y **Comprado**
+(piden iniciar sesión).
+
+## Directos
+
+Con la característica **En directo** la búsqueda devuelve emisiones que están
+en el aire. Su tarjeta lleva el rótulo «En directo» y un único botón, **Ver en
+directo**, que las abre en la ventana de vídeo de la app (la misma de la vista
+previa: se mueve, se redimensiona y pasa a teatro o a pantalla completa).
+
+Un directo en curso **se ve, pero no se descarga**: yt-dlp lo grabaría desde
+ese momento hasta que la emisión terminase, y con una radio de 24 horas eso es
+un hueco de la cola ocupado para siempre. Por eso su tarjeta no ofrece
+«Añadir», y si aun así llega uno a la cola (por ejemplo dentro de una
+playlist) se marca como error al instante con un mensaje que lo explica.
+
+Un directo **ya terminado** es un vídeo como cualquier otro: aparece en las
+búsquedas normales con «emitido hace…» junto a su duración, y se puede ver y
+descargar. Los que están **programados** y aún no han empezado solo enseñan su
+sala de espera.
+
 ## Escuchar antes de descargar
 
-Cada resultado de búsqueda tiene un botón de reproducción sobre su miniatura:
-abre el reproductor de YouTube para decidir si la canción es la que buscabas
-antes de gastar la descarga. Desde su pie se añade a la cola directamente.
+Cada resultado de búsqueda tiene al pie un botón ▶: abre el reproductor de
+YouTube para decidir si la canción es la que buscabas antes de gastar la
+descarga. Con ratón también vale pulsar la miniatura. Desde el pie del
+reproductor se añade a la cola directamente.
 
 Se abre en la misma **ventana flotante** que los vídeos de la biblioteca (ver
 [Ver vídeos](#ver-vídeos)): se mueve, se redimensiona y pasa a modo teatro o a
@@ -50,8 +126,20 @@ la vista previa.
 Se usa el reproductor incrustado de YouTube (dominio `youtube-nocookie.com`,
 que no planta cookies de seguimiento) en lugar de traer el audio por nuestra
 cuenta: las URLs de stream van firmadas y caducan, así que un reproductor
-propio se rompería solo. Requiere conexión, y los vídeos cuyo autor prohíbe
-incrustarlos mostrarán en su lugar un aviso de YouTube.
+propio se rompería solo. Requiere conexión.
+
+La resolución de ese reproductor la decide YouTube según el tamaño de la
+ventana, y no admite que se le pida otra desde fuera: en la ventana pequeña
+suele quedarse en 480p y sube sola a 1080p o más al agrandarla, en modo teatro
+o a pantalla completa. También se puede elegir a mano en su rueda de ajustes.
+
+Hay vídeos que YouTube se niega a reproducir fuera de su web («Este vídeo no
+está disponible / Ver en YouTube»), aunque sean públicos y se puedan descargar.
+Cuando pasa, la ventana cambia sola a un **reproductor propio**, con pausa y
+barra de posición: Sonora pide el vídeo y el audio por separado, en la mejor
+resolución disponible, y ffmpeg los une al vuelo sin guardar nada en disco.
+Tarda unos segundos en arrancar y en saltar a otro punto. Si ni así se puede
+ver —un directo en curso, o falta ffmpeg—, queda el botón **Abrir en YouTube**.
 
 ## Ver vídeos
 
@@ -72,7 +160,10 @@ Además de la ventana flotante hay otros dos modos, en los botones de la barra:
 
 - **Modo teatro**: el vídeo ocupa toda la zona de contenido. También con doble
   clic en la barra de título.
-- **Pantalla completa**: también con doble clic sobre el vídeo.
+- **Pantalla completa**: también con doble clic sobre el vídeo. Al salir, la
+  ventana de la app queda como estaba (maximizada, si lo estaba). En la vista
+  previa vale igual el botón de pantalla completa del reproductor de YouTube:
+  pulsado con la de la app ya puesta, sale de ella.
 
 Sobre el vídeo aparecen sus controles (posición, play/pausa, silencio, volumen
 y velocidad de 0.5× a 2×); se esconden solos mientras se reproduce y vuelven al

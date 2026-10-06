@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify
 
 from .. import db, ffmpeg
 from ..servicios.descargas import MAX_SIMULTANEAS, descargas_simultaneas, normalizar_simultaneas
+from ..servicios.youtube import ORDENES
 from ..ydl_opts import normalizar_bitrate, normalizar_formato, normalizar_resolucion
 from .comun import cuerpo_json, ruta_relativa, texto
 
@@ -17,6 +18,21 @@ bp = Blueprint("config", __name__)
 # Modos del reproductor de vídeo: ventana flotante o teatro (toda la zona de
 # contenido). La pantalla completa no se guarda: siempre se entra a mano.
 MODOS_VIDEO = ("flotante", "teatro")
+
+# Temas de color: el degradado de acento sobre la paleta de negros. Cada uno
+# tiene su bloque ``[data-tema]`` en estilo.css y su muestra en index.html (un
+# test lo comprueba); el primero es el de fábrica.
+TEMAS = (
+    "ocaso",
+    "cobre",
+    "duna",
+    "agave",
+    "turquesa",
+    "oasis",
+    "crepusculo",
+    "buganvilla",
+    "luna",
+)
 
 
 def _numero(valor: object) -> float | None:
@@ -41,6 +57,16 @@ def normalizar_volumen(valor: object) -> str:
 def normalizar_modo_video(valor: object) -> str:
     """Devuelve ``valor`` como modo de vídeo válido, o 'flotante'."""
     return valor if valor in MODOS_VIDEO else "flotante"
+
+
+def normalizar_orden_busqueda(valor: object) -> str:
+    """Devuelve ``valor`` como orden de búsqueda válido, o 'relevancia'."""
+    return valor if valor in ORDENES else ORDENES[0]
+
+
+def normalizar_tema(valor: object) -> str:
+    """Devuelve ``valor`` como tema de color válido, o el de fábrica."""
+    return valor if valor in TEMAS else TEMAS[0]
 
 
 def normalizar_geometria_video(valor: object) -> str:
@@ -100,6 +126,8 @@ def obtener():
         "volumen": float(normalizar_volumen(db.config_obtener("volumen", "1"))),
         "video_modo": normalizar_modo_video(db.config_obtener("video_modo", "flotante")),
         "video_geometria": _geometria_video_guardada(),
+        "tema": normalizar_tema(db.config_obtener("tema", "")),
+        "busqueda_orden": normalizar_orden_busqueda(db.config_obtener("busqueda_orden", "")),
     })
 
 
@@ -138,5 +166,14 @@ def guardar():
         db.config_guardar(
             "video_geometria",
             normalizar_geometria_video(datos["video_geometria"]),
+        )
+    if "tema" in datos:
+        db.config_guardar("tema", normalizar_tema(datos["tema"]))
+    if "busqueda_orden" in datos:
+        # El orden se recuerda; el resto de filtros de búsqueda, no: son de
+        # cada búsqueda, y encontrarlos puestos al abrir la app despistaría.
+        db.config_guardar(
+            "busqueda_orden",
+            normalizar_orden_busqueda(datos["busqueda_orden"]),
         )
     return jsonify({"ok": True})

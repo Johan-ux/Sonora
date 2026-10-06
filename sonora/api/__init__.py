@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from flask import Flask
 
-from . import biblioteca, busqueda, carpetas, cola, config, eventos, salud, vistas
+from . import biblioteca, busqueda, carpetas, cola, config, eventos, previa, salud, vistas
 
-_MODULOS = (vistas, busqueda, cola, eventos, biblioteca, carpetas, config, salud)
+_MODULOS = (vistas, busqueda, previa, cola, eventos, biblioteca, carpetas, config, salud)
 
 
 def registrar_blueprints(app: Flask) -> None:

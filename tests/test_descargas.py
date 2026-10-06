@@ -103,6 +103,46 @@ class TestClasificarErrores:
         assert descargas._es_error_permanente(mensaje) is False
 
 
+class TestDirectos:
+    """Un directo en curso se rechaza: yt-dlp lo grabaría hasta que acabase."""
+
+    @pytest.mark.parametrize(
+        "info",
+        [
+            {"is_live": True},
+            {"live_status": "is_live"},
+            {"live_status": "is_upcoming"},
+        ],
+    )
+    def test_en_emision_o_por_empezar_se_rechaza(self, info):
+        with pytest.raises(DownloadError) as error:
+            descargas._rechazar_directos(info)
+        # Debe ser un fallo definitivo: reintentarlo no cambiaría nada.
+        assert descargas._es_error_permanente(str(error.value)) is True
+
+    @pytest.mark.parametrize(
+        "info",
+        [
+            {},
+            {"is_live": False, "live_status": "not_live"},
+            # Un directo ya terminado es un vídeo como cualquier otro.
+            {"is_live": False, "live_status": "was_live"},
+        ],
+    )
+    def test_lo_demas_pasa(self, info):
+        assert descargas._rechazar_directos(info) is None
+
+    def test_las_descargas_llevan_el_filtro(self, entorno):
+        opciones = descargas._construir_opciones_descarga(
+            "", "audio", "320", "1080", lambda d: None, lambda d: None
+        )
+        assert opciones["match_filter"] is descargas._rechazar_directos
+
+    def test_el_que_aun_no_ha_empezado_no_se_reintenta(self):
+        mensaje = "ERROR: [youtube] abc: This live event will begin in 3 hours."
+        assert descargas._es_error_permanente(mensaje) is True
+
+
 class TestReintentos:
     def test_un_fallo_pasajero_se_reintenta_y_acaba_bien(self, entorno, ydl_falso):
         db.cola_agregar(_item())

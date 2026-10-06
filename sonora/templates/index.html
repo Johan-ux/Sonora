@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-tema="{{ tema }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sonora</title>
     <link rel="icon" type="image/svg+xml"
-          href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="%23151210"/><path d="M8 20V12M13 23V9M18 20v-8M23 17v-3" stroke="%23FFB454" stroke-width="3" stroke-linecap="round"/></svg>'>
+          href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="%23ff4f9a"/><stop offset="1" stop-color="%23ffa040"/></linearGradient></defs><rect width="32" height="32" rx="7" fill="%23000"/><path d="M8 20V12M13 23V9M18 20v-8M23 17v-3" stroke="url(%23g)" stroke-width="3" stroke-linecap="round"/></svg>'>
     <link rel="stylesheet" href="/static/css/estilo.css">
 </head>
 <body>
@@ -19,8 +19,14 @@
         <aside class="sidebar">
             <p class="marca">
                 <svg class="marca-icono" aria-hidden="true" viewBox="0 0 32 32" width="28" height="28">
+                    <defs>
+                        <linearGradient id="degradado-marca" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" class="marca-a"/>
+                            <stop offset="1" class="marca-b"/>
+                        </linearGradient>
+                    </defs>
                     <rect width="32" height="32" rx="7" fill="var(--fondo-2)"/>
-                    <path d="M8 20V12M13 23V9M18 20v-8M23 17v-3" stroke="var(--ambar)" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M8 20V12M13 23V9M18 20v-8M23 17v-3" stroke="url(#degradado-marca)" stroke-width="3" stroke-linecap="round"/>
                 </svg>
                 <span class="marca-nombre">SONORA</span>
             </p>
@@ -61,7 +67,7 @@
                      las descargas dejen de funcionar). -->
                 <div class="aviso-salud" id="aviso-salud" hidden>
                     <p class="aviso-salud-texto" id="aviso-salud-texto"></p>
-                    <button type="button" class="btn btn-ambar btn-actualizar" id="boton-actualizar" hidden>
+                    <button type="button" class="btn btn-acento btn-actualizar" id="boton-actualizar" hidden>
                         Actualizar ahora
                     </button>
                 </div>
@@ -70,6 +76,49 @@
                     Falta ffmpeg: la conversión a MP3 fallará. Instálalo con
                     <code>winget install Gyan.FFmpeg</code>.
                 </p>
+                <!-- Tema de color: el degradado de acento sobre la paleta de
+                     negros. El elegido llega ya aplicado en <html data-tema>;
+                     autocomplete="off" impide que, al recargar, el navegador
+                     restaure la muestra marcada antes y la dé por elegida. -->
+                <fieldset class="temas" id="temas">
+                    <legend>Color</legend>
+                    <label class="tema" data-tema="ocaso" title="Ocaso">
+                        <input type="radio" name="tema" autocomplete="off" value="ocaso">
+                        <span class="visualmente-oculto">Ocaso</span>
+                    </label>
+                    <label class="tema" data-tema="cobre" title="Cobre">
+                        <input type="radio" name="tema" autocomplete="off" value="cobre">
+                        <span class="visualmente-oculto">Cobre</span>
+                    </label>
+                    <label class="tema" data-tema="duna" title="Duna">
+                        <input type="radio" name="tema" autocomplete="off" value="duna">
+                        <span class="visualmente-oculto">Duna</span>
+                    </label>
+                    <label class="tema" data-tema="agave" title="Agave">
+                        <input type="radio" name="tema" autocomplete="off" value="agave">
+                        <span class="visualmente-oculto">Agave</span>
+                    </label>
+                    <label class="tema" data-tema="turquesa" title="Turquesa">
+                        <input type="radio" name="tema" autocomplete="off" value="turquesa">
+                        <span class="visualmente-oculto">Turquesa</span>
+                    </label>
+                    <label class="tema" data-tema="oasis" title="Oasis">
+                        <input type="radio" name="tema" autocomplete="off" value="oasis">
+                        <span class="visualmente-oculto">Oasis</span>
+                    </label>
+                    <label class="tema" data-tema="crepusculo" title="Crepúsculo">
+                        <input type="radio" name="tema" autocomplete="off" value="crepusculo">
+                        <span class="visualmente-oculto">Crepúsculo</span>
+                    </label>
+                    <label class="tema" data-tema="buganvilla" title="Buganvilla">
+                        <input type="radio" name="tema" autocomplete="off" value="buganvilla">
+                        <span class="visualmente-oculto">Buganvilla</span>
+                    </label>
+                    <label class="tema" data-tema="luna" title="Luna">
+                        <input type="radio" name="tema" autocomplete="off" value="luna">
+                        <span class="visualmente-oculto">Luna</span>
+                    </label>
+                </fieldset>
             </div>
         </aside>
 
@@ -84,7 +133,7 @@
                         <label class="visualmente-oculto" for="campo-buscar">Buscar en YouTube o pegar una URL</label>
                         <input id="campo-buscar" type="search" autocomplete="off" spellcheck="false"
                                placeholder="Busca una canción o pega una URL de vídeo, playlist o canal…">
-                        <button type="submit" class="btn btn-ambar">Buscar</button>
+                        <button type="submit" class="btn btn-acento">Buscar</button>
                     </form>
                 </search>
             </header>
@@ -94,6 +143,64 @@
                 <!-- ─────────────── Vista: Buscar ─────────────── -->
                 <section id="vista-buscar" class="vista">
                     <h1 class="visualmente-oculto">Buscar música</h1>
+                    <!-- Filtros de la búsqueda por texto, como los de YouTube;
+                         cambiar cualquiera repite la última búsqueda. No hay
+                         «Películas», «Shorts» ni los que piden cuenta: no
+                         sirven para descargar o YouTube no los admite por esta
+                         vía. autocomplete="off" evita que una recarga restaure
+                         valores que el estado no conoce. -->
+                    <form class="filtros" id="filtros-busqueda" aria-label="Filtros de búsqueda" autocomplete="off">
+                        <label class="ajuste-calidad">
+                            <span>Orden</span>
+                            <select id="filtro-orden" name="orden">
+                                <option value="relevancia">Relevancia</option>
+                                <option value="recientes">Más recientes</option>
+                                <option value="popularidad">Popularidad</option>
+                            </select>
+                        </label>
+                        <label class="ajuste-calidad">
+                            <span>Fecha de subida</span>
+                            <select name="fecha">
+                                <option value="">Cualquiera</option>
+                                <option value="hoy">Hoy</option>
+                                <option value="semana">Esta semana</option>
+                                <option value="mes">Este mes</option>
+                                <option value="anio">Este año</option>
+                            </select>
+                        </label>
+                        <label class="ajuste-calidad">
+                            <span>Duración</span>
+                            <select name="duracion">
+                                <option value="">Cualquiera</option>
+                                <option value="corta">Menos de 4 minutos</option>
+                                <option value="media">De 4 a 20 minutos</option>
+                                <option value="larga">Más de 20 minutos</option>
+                            </select>
+                        </label>
+                        <label class="ajuste-calidad">
+                            <span>Tipo</span>
+                            <select name="tipo">
+                                <option value="video">Vídeos</option>
+                                <option value="lista">Listas</option>
+                                <option value="canal">Canales</option>
+                            </select>
+                        </label>
+                        <button type="button" class="btn btn-fantasma" id="filtros-quitar" hidden>Quitar filtros</button>
+                        <details class="filtro-caracteristicas">
+                            <summary>Características <span class="filtro-contador" id="filtro-caracteristicas-n" hidden></span></summary>
+                            <div class="filtro-chips">
+                                <label class="chip-filtro"><input type="checkbox" name="caracteristicas" value="directo"><span>En directo</span></label>
+                                <label class="chip-filtro"><input type="checkbox" name="caracteristicas" value="4k"><span>4K</span></label>
+                                <label class="chip-filtro"><input type="checkbox" name="caracteristicas" value="hd"><span>HD</span></label>
+                                <label class="chip-filtro"><input type="checkbox" name="caracteristicas" value="hdr"><span>HDR</span></label>
+                                <label class="chip-filtro"><input type="checkbox" name="caracteristicas" value="subtitulos"><span>Subtítulos</span></label>
+                                <label class="chip-filtro"><input type="checkbox" name="caracteristicas" value="cc"><span>Creative Commons</span></label>
+                                <label class="chip-filtro"><input type="checkbox" name="caracteristicas" value="360"><span>360°</span></label>
+                                <label class="chip-filtro"><input type="checkbox" name="caracteristicas" value="vr180"><span>VR180</span></label>
+                                <label class="chip-filtro"><input type="checkbox" name="caracteristicas" value="3d"><span>3D</span></label>
+                            </div>
+                        </details>
+                    </form>
                     <div id="resultados">
                         <div class="estado-vacio">
                             <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -158,7 +265,7 @@
                     </div>
 
                     <div class="cola-acciones" id="cola-acciones" hidden>
-                        <button type="button" class="btn btn-ambar" id="btn-descargar">
+                        <button type="button" class="btn btn-acento" id="btn-descargar">
                             <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             <span id="btn-descargar-texto">Descargar todo</span>
                         </button>
@@ -328,7 +435,7 @@
         </div>
         <footer class="ev-pie" id="ev-pie" hidden>
             <p class="ev-canal" id="preview-canal"></p>
-            <button type="button" class="btn btn-ambar" id="btn-preview-descargar">＋ Añadir a la cola</button>
+            <button type="button" class="btn btn-acento" id="btn-preview-descargar">＋ Añadir a la cola</button>
         </footer>
         <!-- Asas de redimensionado (solo puntero; con teclado, el botón de agarre). -->
         <span class="ev-asa" data-dir="n" aria-hidden="true"></span>
@@ -344,7 +451,7 @@
     <!-- ===============================================================
          Diálogo modal: explorador de carpetas de destino
          =============================================================== -->
-    <dialog id="dialogo-carpetas" aria-labelledby="dlg-titulo">
+    <dialog id="dialogo-carpetas" aria-labelledby="dlg-titulo" closedby="any">
         <h2 id="dlg-titulo">Elegir carpeta de destino</h2>
         <p class="dlg-ruta">
             <button type="button" class="btn-icono" id="btn-dlg-subir" aria-label="Subir a la carpeta superior" hidden>
@@ -360,7 +467,7 @@
         </div>
         <form method="dialog" class="dlg-pie">
             <button type="submit" class="btn btn-fantasma" value="cancelar">Cancelar</button>
-            <button type="button" class="btn btn-ambar" id="btn-dlg-seleccionar">Guardar aquí</button>
+            <button type="button" class="btn btn-acento" id="btn-dlg-seleccionar">Guardar aquí</button>
         </form>
     </dialog>
 
@@ -368,7 +475,7 @@
          Diálogo de confirmación propio (sustituye a window.confirm, que en
          una app de escritorio muestra el "127.0.0.1 dice…" del navegador).
          =============================================================== -->
-    <dialog id="dialogo-confirmar" class="dialogo-confirmar" aria-labelledby="conf-titulo">
+    <dialog id="dialogo-confirmar" class="dialogo-confirmar" aria-labelledby="conf-titulo" closedby="any">
         <h2 id="conf-titulo"></h2>
         <p id="conf-mensaje" class="conf-mensaje"></p>
         <form method="dialog" class="dlg-pie">
@@ -377,8 +484,11 @@
         </form>
     </dialog>
 
-    <!-- Avisos (toasts): región viva única, cortés -->
-    <div id="avisos" class="avisos" role="status" aria-live="polite"></div>
+    <!-- Avisos (toasts): región viva única, cortés. Es un popover manual para
+         vivir en la capa superior (se ve sobre diálogos y a pantalla
+         completa); se abre al arrancar y ya no se cierra, de modo que los
+         lectores de pantalla la tienen siempre presente. -->
+    <div id="avisos" class="avisos" role="status" aria-live="polite" popover="manual"></div>
 
     <script src="/static/js/app.js" defer></script>
 </body>

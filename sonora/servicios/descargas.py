@@ -81,7 +81,28 @@ ERRORES_PERMANENTES = (
     "no video formats found",
     "unsupported url",
     "is not a valid url",
+    # Directos: el que aún no ha empezado y el que sigue en emisión (este
+    # último lo rechaza _rechazar_directos con MENSAJE_DIRECTO).
+    "live event will begin",
+    "emisión en directo",
 )
+
+# Texto con el que se rechaza un directo en curso.
+MENSAJE_DIRECTO = (
+    "Es una emisión en directo que aún no ha terminado: se podrá descargar cuando acabe."
+)
+
+
+def _rechazar_directos(info: dict, *, incomplete: bool = False) -> None:
+    """``match_filter`` de yt-dlp: un directo en curso no se descarga.
+
+    yt-dlp sí sabe bajarlos, pero graba desde ahora hasta que la emisión acabe:
+    con una radio de 24 horas eso es un hueco de la cola ocupado para siempre.
+    Se lanza el error en vez de devolver un motivo porque un motivo solo hace
+    que yt-dlp se salte el vídeo en silencio, y el ítem se daría por descargado.
+    """
+    if info.get("is_live") or info.get("live_status") in ("is_live", "is_upcoming"):
+        raise DownloadError(MENSAJE_DIRECTO)
 
 
 def _es_error_permanente(mensaje: str) -> bool:
@@ -273,6 +294,8 @@ def _construir_opciones_descarga(
         # la URL fuese un canal/playlist a secas, 'playlist_items=1' impide que
         # se descargue la colección entera: como mucho baja un único vídeo.
         "playlist_items": "1",
+        # Un directo en curso no acabaría nunca de descargarse: se rechaza.
+        "match_filter": _rechazar_directos,
         "quiet": True,
         "no_warnings": True,
         "progress_hooks": [hook],

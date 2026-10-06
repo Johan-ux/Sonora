@@ -1,21 +1,29 @@
 /* ==========================================================================
    Sonora — hoja de estilos
    --------------------------------------------------------------------------
-   Tema oscuro cálido «válvula y vinilo»: superficies espresso (marrón-negro)
-   con un único acento ámbar (el brillo de una válvula de amplificador), en
-   lugar del negro neutro + verde/rojo de Spotify/YT Music. La firma visual
-   es el pequeño ecualizador ámbar de la barra de reproducción; el resto de
-   la interfaz se mantiene deliberadamente quieta.
+   «Noche en el desierto»: una paleta de negros (negro puro de fondo y tres
+   negros neutros para las superficies) y un acento que no es un color sino
+   un degradado, el de la última luz en el horizonte. El degradado se gasta
+   en muy pocos sitios —la acción principal, lo que suena, el progreso— y en
+   la firma visual: la línea del horizonte que corona la barra de
+   reproducción y se aviva cuando hay música. El resto se queda quieto.
+   Para que tanto negro no pese, de la esquina superior derecha baja además
+   un resplandor amplio y tenue con el mismo degradado.
+
+   El acento es intercambiable (atributo data-tema en <html>): nueve
+   degradados con nombres del desierto, de Ocaso a Luna. Ninguno es el color
+   plano de una marca; lo propio de Sonora es el degradado de dos tonos.
 
    Tipografía (nativa de Windows, sin dependencias de red):
-     - Bahnschrift (semi-condensada): marca, navegación y rótulos → sabor
-       de dial de radio / rotulación DIN.
+     - Bahnschrift (semi-condensada): marca, navegación y rótulos.
      - Segoe UI Variable / Segoe UI: cuerpo.
-     - Cascadia Mono / Consolas: tiempos, porcentajes y contadores → sabor
-       de equipo de estudio.
+     - Cascadia Mono / Consolas: tiempos, porcentajes y contadores.
 
-   Entorno: app de escritorio sobre WebView2 (Chromium en Windows 11).
-   Accesibilidad: contraste AA, foco visible siempre, reduced-motion.
+   Entorno: app de escritorio sobre WebView2 (Chromium siempre al día en
+   Windows 11), así que se usa CSS moderno sin alternativas para navegadores
+   antiguos: color-mix(), degradados «in oklab», :has() y @container.
+   Accesibilidad: contraste AA, foco visible siempre, reduced-motion y modo
+   de colores forzados.
    ========================================================================== */
 
 /* ----------------------------- Tokens ----------------------------------- */
@@ -23,42 +31,150 @@
 :root {
     color-scheme: dark;
 
-    /* Superficies (espresso, de más profundo a más elevado) */
-    --fondo-0: #151210;      /* fondo raíz */
-    --fondo-1: #1d1915;      /* sidebar / reproductor */
-    --fondo-2: #262019;      /* tarjetas, filas, inputs */
-    --fondo-3: #322a21;      /* hover / elevación */
-    --linea:   #3a3229;      /* bordes sutiles (decorativos) */
-    --linea-fuerte: #6f6151; /* bordes de controles: ≈3:1 sobre fondo-2 (AA no textual) */
+    /* Paletas de acento, en orden de tono: los dos extremos del degradado
+       (a → b) y un tono liso para texto, iconos y foco (≥ 8:1 sobre los
+       negros). Crepúsculo y Buganvilla nacen del violeta #a238ff. */
+    --ocaso-a: #ff4f9a;       --ocaso-b: #ffa040;       --ocaso: #ff78b2;
+    --cobre-a: #ff7a3d;       --cobre-b: #ffc96b;       --cobre: #ffa25c;
+    --duna-a: #f3e2b5;        --duna-b: #e9a94b;        --duna: #f0cf8a;
+    --agave-a: #d6f25c;       --agave-b: #4fd99a;       --agave: #b9ea6e;
+    --turquesa-a: #19d3e6;    --turquesa-b: #62f0b9;    --turquesa: #3fe3cf;
+    --oasis-a: #3d7bff;       --oasis-b: #38e1ff;       --oasis: #7db4ff;
+    --crepusculo-a: #a238ff;  --crepusculo-b: #4a5cff;  --crepusculo: #b79cff;
+    --buganvilla-a: #a238ff;  --buganvilla-b: #d81b8a;  --buganvilla: #d58dff;
+    --luna-a: #ffffff;        --luna-b: #9fb4cc;        --luna: #dfe7f0;
+
+    /* Negros (de más profundo a más elevado) */
+    --fondo-0: #000000;      /* fondo raíz */
+    --fondo-1: #0b0b0c;      /* sidebar / reproductor */
+    --fondo-2: #151517;      /* tarjetas, filas, inputs */
+    --fondo-3: #212125;      /* hover / elevación */
+    --linea:   #26262b;      /* bordes sutiles (decorativos) */
+    --linea-fuerte: #6a6a74; /* bordes de controles: ≈3.4:1 sobre fondo-2 (AA no textual) */
 
     /* Texto */
-    --texto:        #f3eee5; /* principal (≈14:1 sobre fondo-1) */
-    --texto-suave:  #b9ae9e; /* secundario (≈7:1 sobre fondo-1)  */
-    --texto-tenue:  #94897a; /* terciario  (≈4.6:1 sobre fondo-1) */
+    --texto:        #f5f5f7; /* principal */
+    --texto-suave:  #b4b4bd; /* secundario (≈9:1 sobre fondo-1)  */
+    --texto-tenue:  #878791; /* terciario  (≈5:1 sobre fondo-2); nunca sobre el resplandor */
 
-    /* Acento ámbar (válvula) */
-    --ambar:        #ffb454; /* ≈9.3:1 sobre fondo-1 */
-    --ambar-vivo:   #ffc876;
-    --sobre-ambar:  #241a0d; /* texto sobre ámbar */
-    --ambar-suave:  rgba(255, 180, 84, 0.14);
+    /* Acento activo: Ocaso por defecto; los demás temas, justo debajo */
+    --acento-a: var(--ocaso-a);
+    --acento-b: var(--ocaso-b);
+    --acento:   var(--ocaso);
+    --acento-vivo:  color-mix(in oklab, var(--acento) 78%, white);
+    --acento-suave: color-mix(in oklab, var(--acento) 15%, transparent);
+    /* Texto sobre el degradado (≥ 5:1 en su extremo más oscuro); los temas de
+       degradado oscuro lo cambian a blanco. */
+    --sobre-acento: #0a0a0b;
+    --degradado: linear-gradient(90deg in oklab, var(--acento-a), var(--acento-b));
+    --degradado-diagonal: linear-gradient(135deg in oklab, var(--acento-a), var(--acento-b));
 
-    /* Estados (texto AA sobre superficies oscuras) */
-    --ok:        #7dd8a0;
-    --ok-suave:  rgba(125, 216, 160, 0.14);
-    --error:     #f2938c;
-    --error-suave: rgba(242, 147, 140, 0.14);
+    /* Resplandor de la esquina superior derecha (.principal::before): su
+       opacidad en el punto más vivo. Va por tema porque un degradado claro
+       alumbra más que uno oscuro; con estos valores el texto secundario
+       conserva 4.5:1 incluso encima de la esquina. El terciario no lo pisa. */
+    --resplandor: 0.46;
+    /* Tarjetas y paneles: translúcidos, para que el resplandor los tiña. */
+    --superficie: color-mix(in oklab, var(--fondo-2) 68%, transparent);
+    /* Controles de formulario: relleno de los campos y su capa al pasar o al
+       elegir en un menú (las «state layers» de Material 3). */
+    --campo:        color-mix(in oklab, var(--texto) 7%, transparent);
+    --campo-activo: color-mix(in oklab, var(--texto) 13%, transparent);
+
+    /* Estados (texto AA sobre los negros) */
+    --ok:        #5ee0a0;
+    --ok-suave:  color-mix(in oklab, var(--ok) 14%, transparent);
+    --error:     #ff6b6b;
+    --error-suave: color-mix(in oklab, var(--error) 14%, transparent);
+    --sobre-error: #1c0707;  /* texto sobre el rojo del botón destructivo */
+
+    /* Velos: lo que oscurece portadas y el fondo de los diálogos */
+    --velo:        rgba(0, 0, 0, 0.45);
+    --velo-fuerte: rgba(0, 0, 0, 0.78);
 
     /* Tipografía */
     --fuente-rotulo: "Bahnschrift SemiCondensed", Bahnschrift, "Segoe UI", sans-serif;
     --fuente-cuerpo: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
     --fuente-mono:   "Cascadia Mono", Consolas, monospace;
 
+    /* Superficie inversa (clara): la de los avisos, como en Material 3 */
+    --inverso:       #e6e1e5;
+    --sobre-inverso: #1d1b20;
+    --ok-inverso:    #146c2e;
+    --error-inverso: #b3261e;
+
+    /* Formas: la escala de Material 3. Botones y navegación van en píldora. */
+    --radio-xs: 4px;   /* campos de texto, avisos */
+    --radio-s:  8px;   /* chips, miniaturas */
+    --radio:    12px;  /* tarjetas, filas de lista */
+    --radio-l:  16px;  /* menús */
+    --radio-xl: 28px;  /* diálogos */
+
     /* Métricas */
-    --radio: 10px;
-    --radio-s: 7px;
     --sidebar-ancho: 236px;
     --reproductor-alto: 84px;
     --transicion: 160ms ease;
+
+    accent-color: var(--acento);
+}
+
+:root[data-tema="cobre"] {
+    --acento-a: var(--cobre-a);
+    --acento-b: var(--cobre-b);
+    --acento:   var(--cobre);
+    --resplandor: 0.42;
+}
+
+:root[data-tema="duna"] {
+    --acento-a: var(--duna-a);
+    --acento-b: var(--duna-b);
+    --acento:   var(--duna);
+    --resplandor: 0.29;
+}
+
+:root[data-tema="agave"] {
+    --acento-a: var(--agave-a);
+    --acento-b: var(--agave-b);
+    --acento:   var(--agave);
+    --resplandor: 0.29;
+}
+
+:root[data-tema="turquesa"] {
+    --acento-a: var(--turquesa-a);
+    --acento-b: var(--turquesa-b);
+    --acento:   var(--turquesa);
+    --resplandor: 0.35;
+}
+
+:root[data-tema="oasis"] {
+    --acento-a: var(--oasis-a);
+    --acento-b: var(--oasis-b);
+    --acento:   var(--oasis);
+    --resplandor: 0.50;
+}
+
+/* Los degradados violetas son oscuros: encima va texto blanco (≥ 4.6:1). */
+:root[data-tema="crepusculo"] {
+    --acento-a: var(--crepusculo-a);
+    --acento-b: var(--crepusculo-b);
+    --acento:   var(--crepusculo);
+    --resplandor: 0.56;
+    --sobre-acento: #ffffff;
+}
+
+:root[data-tema="buganvilla"] {
+    --acento-a: var(--buganvilla-a);
+    --acento-b: var(--buganvilla-b);
+    --acento:   var(--buganvilla);
+    --resplandor: 0.56;
+    --sobre-acento: #ffffff;
+}
+
+:root[data-tema="luna"] {
+    --acento-a: var(--luna-a);
+    --acento-b: var(--luna-b);
+    --acento:   var(--luna);
+    --resplandor: 0.26;
 }
 
 /* --------------------------- Base / reset ------------------------------- */
@@ -96,9 +212,8 @@ img { display: block; max-width: 100%; }
 
 /* Foco visible SIEMPRE (nunca outline:none sin sustituto) */
 :focus-visible {
-    outline: 2px solid var(--ambar);
+    outline: 2px solid var(--acento);
     outline-offset: 2px;
-    border-radius: 4px;
 }
 
 /* Utilidades de accesibilidad */
@@ -120,14 +235,19 @@ img { display: block; max-width: 100%; }
     left: 12px;
     z-index: 100;
     padding: 8px 14px;
-    background: var(--ambar);
-    color: var(--sobre-ambar);
+    background: var(--acento);
+    color: var(--sobre-acento);
     border-radius: var(--radio-s);
     font-weight: 600;
     text-decoration: none;
     transition: top var(--transicion);
 }
 .salto-contenido:focus-visible { top: 12px; }
+
+::selection {
+    background: color-mix(in oklab, var(--acento) 38%, transparent);
+    color: var(--texto);
+}
 
 /* ------------------------------ Layout ---------------------------------- */
 
@@ -146,6 +266,26 @@ img { display: block; max-width: 100%; }
     grid-template-rows: auto minmax(0, 1fr);
     min-width: 0;
     min-height: 0;
+    position: relative;
+    isolation: isolate; /* el resplandor queda detrás del contenido, no del fondo */
+}
+
+/* Resplandor: el degradado del tema entra por la esquina superior derecha y
+   se va apagando despacio hasta más allá del centro, de modo que tiñe buena
+   parte de la zona de contenido y la app no se ve tan negra. Va por detrás
+   de todo y no estorba. */
+.principal::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(ellipse 125% 135% at 100% 0% in oklab,
+        var(--acento-a),
+        color-mix(in oklab, var(--acento-b) 62%, transparent) 30%,
+        color-mix(in oklab, var(--acento-b) 24%, transparent) 58%,
+        transparent 100%);
+    opacity: var(--resplandor);
+    pointer-events: none;
 }
 
 main {
@@ -211,15 +351,19 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     gap: 2px;
 }
 
+/* Destinos de navegación de Material 3: 56px de alto, forma de píldora y,
+   en el activo, el indicador tonal del acento ocupando toda la fila. */
 .nav-item {
     display: flex;
     align-items: center;
     gap: 12px;
     width: 100%;
-    padding: 10px 12px;
+    min-height: 56px;
+    padding: 0 24px 0 16px;
     background: none;
     border: 0;
-    border-radius: var(--radio-s);
+    position: relative;
+    border-radius: 999px;
     color: var(--texto-suave);
     font-family: var(--fuente-rotulo);
     font-size: 1rem;
@@ -229,28 +373,30 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 }
 
 .nav-item svg {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     flex: none;
 }
 
 .nav-item:hover {
-    background: var(--fondo-2);
+    background: var(--campo);
     color: var(--texto);
 }
 
 .nav-item[aria-current="page"] {
-    background: var(--ambar-suave);
-    color: var(--ambar);
+    background: var(--acento-suave);
+    color: var(--texto);
 }
+
+.nav-item[aria-current="page"] svg { color: var(--acento); }
 
 .nav-badge {
     margin-left: auto;
     min-width: 22px;
     padding: 1px 7px;
     border-radius: 999px;
-    background: var(--ambar);
-    color: var(--sobre-ambar);
+    background: var(--degradado);
+    color: var(--sobre-acento);
     font-family: var(--fuente-mono);
     font-size: 0.75rem;
     font-weight: 700;
@@ -260,6 +406,74 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 .sidebar-pie {
     margin-top: auto;
     padding: 0 6px;
+}
+
+/* El trazo de la marca lleva el degradado del tema (stops del SVG). */
+.marca-a { stop-color: var(--acento-a); }
+.marca-b { stop-color: var(--acento-b); }
+
+/* Selector de tema: una muestra redonda por degradado. Son radios nativos
+   (flechas, foco y lectores de pantalla gratis) con la apariencia quitada. */
+.temas {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0 0;
+    padding: 10px 6px 4px;
+    border: 0;
+    border-top: 1px solid var(--linea);
+}
+
+.temas legend {
+    /* Flotada deja de montarse sobre el borde y pasa a ser la primera fila;
+       las muestras se reparten debajo. */
+    float: left;
+    width: 100%;
+    padding: 0;
+    color: var(--texto-tenue);
+    font-size: 0.8125rem;
+}
+
+.tema {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    flex: none;
+    border-radius: 50%;
+    background: linear-gradient(135deg in oklab, var(--muestra-a), var(--muestra-b));
+    /* El color ES la información: no debe perderse con colores forzados. */
+    forced-color-adjust: none;
+}
+
+.tema[data-tema="ocaso"]      { --muestra-a: var(--ocaso-a); --muestra-b: var(--ocaso-b); }
+.tema[data-tema="cobre"]      { --muestra-a: var(--cobre-a); --muestra-b: var(--cobre-b); }
+.tema[data-tema="duna"]       { --muestra-a: var(--duna-a); --muestra-b: var(--duna-b); }
+.tema[data-tema="agave"]      { --muestra-a: var(--agave-a); --muestra-b: var(--agave-b); }
+.tema[data-tema="turquesa"]   { --muestra-a: var(--turquesa-a); --muestra-b: var(--turquesa-b); }
+.tema[data-tema="oasis"]      { --muestra-a: var(--oasis-a); --muestra-b: var(--oasis-b); }
+.tema[data-tema="crepusculo"] { --muestra-a: var(--crepusculo-a); --muestra-b: var(--crepusculo-b); }
+.tema[data-tema="buganvilla"] { --muestra-a: var(--buganvilla-a); --muestra-b: var(--buganvilla-b); }
+.tema[data-tema="luna"]       { --muestra-a: var(--luna-a); --muestra-b: var(--luna-b); }
+
+.tema input {
+    appearance: none;
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* El elegido se rodea con un anillo separado de la muestra. */
+.tema:has(:checked) {
+    outline: 2px solid var(--texto);
+    outline-offset: 2px;
+}
+
+.tema input:focus-visible {
+    outline: 2px solid var(--acento);
+    outline-offset: 5px;
 }
 
 .aviso-ffmpeg {
@@ -284,7 +498,7 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 }
 
 /* Chequeo del entorno: versión de yt-dlp, ffmpeg y runtime de JavaScript.
-   Comparte el aire del aviso de ffmpeg, pero en ámbar cuando es solo una
+   Comparte el aire del aviso de ffmpeg, pero con el acento cuando es solo una
    recomendación (hay actualización) y en rojo cuando algo ya está roto. */
 
 .aviso-salud {
@@ -294,10 +508,10 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     align-items: flex-start;
     margin-bottom: 10px;
     padding: 10px 12px;
-    border: 1px solid var(--ambar);
+    border: 1px solid var(--acento);
     border-radius: var(--radio-s);
-    background: var(--ambar-suave);
-    color: var(--ambar);
+    background: var(--acento-suave);
+    color: var(--acento);
     font-size: 0.8125rem;
     line-height: 1.45;
 }
@@ -323,56 +537,37 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 
 /* Botón compacto: la barra lateral es estrecha (236px). */
 .btn-actualizar {
-    padding: 6px 14px;
+    min-height: 32px;
+    padding: 0 16px;
     font-size: 0.8125rem;
-}
-
-/* ------------------- Vista previa (botón de la tarjeta) ------------------ */
-
-/* Botón de escucha superpuesto en la portada del resultado. Aparece al pasar
-   por encima, pero se mantiene visible al enfocarlo con el teclado. */
-.tarjeta-preview {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    border: 0;
-    background: rgba(10, 8, 6, 0.45);
-    color: var(--texto);
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity var(--transicion);
-}
-
-.tarjeta:hover .tarjeta-preview,
-.tarjeta-preview:focus-visible { opacity: 1; }
-
-.tarjeta-preview svg {
-    width: 44px;
-    height: 44px;
-    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
 }
 
 /* ------------------------------ Topbar ---------------------------------- */
 
 .topbar {
     padding: 14px 28px 10px;
-    background: var(--fondo-0);
 }
 
+/* Barra de búsqueda al estilo Material 3: una píldora rellena y sin borde,
+   con un anillo del acento al enfocarla. Es opaca a propósito: su texto de
+   ayuda es terciario y encima del resplandor no llegaría a AA. */
 .buscador form {
     display: flex;
     align-items: center;
     gap: 10px;
     max-width: 720px;
-    padding: 4px 6px 4px 14px;
-    background: var(--fondo-2);
-    border: 1px solid var(--linea-fuerte);
+    min-height: 56px;
+    padding: 6px 6px 6px 18px;
+    background: var(--fondo-3);
     border-radius: 999px;
-    transition: border-color var(--transicion);
+    outline: 2px solid transparent;
+    outline-offset: -2px;
+    transition: background var(--transicion), outline-color var(--transicion);
 }
 
-.buscador form:focus-within { border-color: var(--ambar); }
+.buscador form:hover { background: color-mix(in oklab, var(--fondo-3) 88%, white); }
+.buscador form:focus-within { outline-color: var(--acento); }
+.buscador .btn { min-height: 44px; }
 
 .buscador-icono {
     width: 18px;
@@ -396,44 +591,59 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 
 /* ------------------------------ Botones --------------------------------- */
 
+/* Botones comunes de Material 3: 40px de alto y forma de píldora. El relleno
+   marca la jerarquía: degradado (acción principal), contorno (secundaria) y
+   rojo (destructiva). */
 .btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
-    padding: 8px 16px;
+    min-height: 40px;
+    padding: 0 24px;
     border-radius: 999px;
     border: 1px solid transparent;
     font-weight: 600;
     font-size: 0.875rem;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
     cursor: pointer;
     transition: background var(--transicion), border-color var(--transicion),
-                color var(--transicion), transform var(--transicion);
+                color var(--transicion), transform var(--transicion),
+                filter var(--transicion);
 }
+
+/* Con un icono delante, el margen de ese lado se acorta (16px en vez de 24). */
+.btn:has(> svg:first-child) { padding-left: 16px; }
 
 .btn:active { transform: scale(0.97); }
 
-.btn-ambar {
-    background: var(--ambar);
-    color: var(--sobre-ambar);
+/* Acción principal: el degradado. Al pasar por encima solo gana luz. */
+.btn-acento {
+    background: var(--degradado);
+    color: var(--sobre-acento);
 }
-.btn-ambar:hover { background: var(--ambar-vivo); }
+.btn-acento:hover { filter: brightness(1.12); }
 
+/* Con contorno. Material 3 pone su etiqueta en el color primario; aquí se
+   queda en blanco porque el acento, encima del resplandor de la esquina, no
+   llega al contraste AA. El acento aparece al pasar, como capa de estado. */
 .btn-fantasma {
     background: transparent;
     border-color: var(--linea-fuerte);
     color: var(--texto);
 }
 .btn-fantasma:hover {
-    border-color: var(--ambar);
-    color: var(--ambar);
+    background: var(--acento-suave);
+    border-color: var(--acento);
 }
 
 /* Acción destructiva (confirmar borrado). */
 .btn-peligro {
     background: var(--error);
-    color: #2a1210;
+    color: var(--sobre-error);
 }
-.btn-peligro:hover { background: #f7aca6; }
+.btn-peligro:hover { background: color-mix(in oklab, var(--error) 78%, white); }
 
 .btn[disabled], .btn[aria-disabled="true"] {
     opacity: 0.45;
@@ -441,12 +651,13 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     pointer-events: none;
 }
 
+/* Botón de icono: 40px, con una capa de estado circular al pasar. */
 .btn-icono {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
+    width: 40px;
+    height: 40px;
     padding: 0;
     border: 0;
     border-radius: 50%;
@@ -456,10 +667,10 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     transition: background var(--transicion), color var(--transicion);
 }
 
-.btn-icono svg { width: 20px; height: 20px; }
+.btn-icono svg { width: 22px; height: 22px; }
 
 .btn-icono:hover {
-    background: var(--fondo-3);
+    background: var(--campo-activo);
     color: var(--texto);
 }
 
@@ -499,7 +710,7 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     width: 18px;
     height: 18px;
     border: 2px solid var(--linea-fuerte);
-    border-top-color: var(--ambar);
+    border-top-color: var(--acento);
     border-radius: 50%;
     animation: girar 0.8s linear infinite;
 }
@@ -532,11 +743,118 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     white-space: nowrap;
 }
 
-.chip-ambar  { border-color: var(--ambar); color: var(--ambar); background: var(--ambar-suave); }
+.chip-acento  { border-color: var(--acento); color: var(--acento); background: var(--acento-suave); }
 .chip-ok     { border-color: var(--ok); color: var(--ok); background: var(--ok-suave); }
 .chip-error  { border-color: var(--error); color: var(--error); background: var(--error-suave); }
 
 /* --------------------------- Vista: Buscar ------------------------------ */
+
+/* Filtros de la búsqueda: los desplegables en fila y, plegadas debajo, las
+   características (casillas nativas con aspecto de chip). */
+.filtros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    margin-bottom: 18px;
+}
+
+.filtro-caracteristicas { flex-basis: 100%; }
+
+.filtro-caracteristicas summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 4px 2px 0;
+    border-radius: var(--radio-xs);
+    color: var(--texto-suave);
+    font-size: 0.875rem;
+    cursor: pointer;
+    list-style: none;
+    transition: color var(--transicion);
+}
+
+.filtro-caracteristicas summary::-webkit-details-marker { display: none; }
+.filtro-caracteristicas summary:hover { color: var(--texto); }
+
+.filtro-caracteristicas summary::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform var(--transicion);
+}
+
+.filtro-caracteristicas[open] summary::before { transform: rotate(45deg); }
+
+.filtro-contador {
+    min-width: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--degradado);
+    color: var(--sobre-acento);
+    font-family: var(--fuente-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.filtro-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.chip-filtro {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 32px;
+    padding: 0 14px;
+    border-radius: var(--radio-s);
+    border: 1px solid var(--linea-fuerte);
+    color: var(--texto-suave);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    transition: border-color var(--transicion), color var(--transicion),
+                background var(--transicion);
+}
+
+.chip-filtro input {
+    appearance: none;
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    border-radius: inherit;
+    cursor: pointer;
+}
+
+.chip-filtro:hover { background: var(--campo); color: var(--texto); }
+
+.chip-filtro:has(:checked) {
+    padding-left: 10px;
+    background: var(--acento-suave);
+    border-color: transparent;
+    color: var(--acento);
+}
+
+/* La marca de «elegido», para que el estado no dependa solo del color. */
+.chip-filtro:has(:checked)::before {
+    content: "";
+    width: 9px;
+    height: 5px;
+    margin: 0 1px 3px;
+    border-left: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    rotate: -45deg;
+}
+
+/* Al abrir una lista o un canal desde los resultados, el camino de vuelta. */
+.playlist-volver { margin-bottom: 14px; }
 
 .playlist-cabecera {
     display: flex;
@@ -556,8 +874,8 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     display: block; /* block, no flex: el texto lleva <strong> intercalado */
     margin: 10px 0 4px;
     padding: 10px 14px;
-    border-left: 3px solid var(--ambar);
-    background: var(--ambar-suave);
+    border-left: 3px solid var(--acento);
+    background: var(--acento-suave);
     border-radius: 0 var(--radio-s) var(--radio-s) 0;
     color: var(--texto-suave);
     font-size: 0.875rem;
@@ -579,17 +897,19 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 }
 
 .lote-chip {
-    padding: 5px 13px;
-    border-radius: 999px;
+    min-height: 32px;
+    padding: 0 14px;
+    border-radius: var(--radio-s);
     border: 1px solid var(--linea-fuerte);
-    background: var(--fondo-2);
+    background: transparent;
     color: var(--texto-suave);
     font-size: 0.8125rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: border-color var(--transicion), color var(--transicion);
+    transition: background var(--transicion), color var(--transicion);
 }
 
-.lote-chip:hover:not([disabled]) { border-color: var(--ambar); color: var(--ambar); }
+.lote-chip:hover:not([disabled]) { background: var(--campo); color: var(--texto); }
 .lote-chip[disabled] { opacity: 0.45; cursor: default; }
 
 .resultados-grid {
@@ -598,9 +918,13 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     gap: 16px;
 }
 
+/* Tarjeta de resultado: la portada va limpia, sin nada encima; debajo, el
+   título, el canal, la duración con la fecha y, al pie, las acciones. */
 .tarjeta {
     position: relative;
-    background: var(--fondo-2);
+    display: flex;
+    flex-direction: column;
+    background: var(--superficie);
     border: 1px solid transparent;
     border-radius: var(--radio);
     padding: 10px;
@@ -613,7 +937,6 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 }
 
 .tarjeta-cover {
-    position: relative;
     aspect-ratio: 16 / 9;
     border-radius: var(--radio-s);
     overflow: hidden;
@@ -621,93 +944,150 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     margin-bottom: 10px;
 }
 
+/* Con ratón, la portada también abre la vista previa. */
+.tarjeta-cover.con-preview { cursor: pointer; }
+
 .tarjeta-cover img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.tarjeta-duracion {
-    position: absolute;
-    right: 6px;
-    bottom: 6px;
-    padding: 1px 7px;
-    border-radius: 5px;
-    background: rgba(15, 12, 9, 0.82);
-    color: var(--texto);
-    font-family: var(--fuente-mono);
-    font-size: 0.75rem;
+/* Un canal enseña su avatar, que es redondo y no una miniatura apaisada. */
+.tarjeta-coleccion.es-canal .tarjeta-cover {
+    display: grid;
+    place-items: center;
 }
+
+.tarjeta-coleccion.es-canal .tarjeta-cover img {
+    width: auto;
+    height: 82%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+}
+
+.tarjeta-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 1.6em;
+    margin-top: 4px;
+    color: var(--texto-suave);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.tarjeta-duracion {
+    font-family: var(--fuente-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Emisión en directo: el punto rojo de «en el aire» delante del rótulo. */
+.tarjeta-directo {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--texto);
+    font-weight: 600;
+}
+
+.tarjeta-directo::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--error);
+}
+
+/* Pie de la tarjeta: escuchar a la izquierda; añadir (con su ▾) ocupa el
+   resto. margin-top: auto lo ancla abajo aunque el título sea de una línea. */
+.tarjeta-acciones {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 10px;
+}
+
+.tarjeta-preview { flex: none; }
 
 .tarjeta-add-grupo {
-    position: absolute;
-    right: 8px;
-    top: 8px;
-    /* Por encima de .tarjeta-preview, que ocupa la portada entera. */
-    z-index: 1;
     display: flex;
-    gap: 3px;
-    opacity: 0;
-    transform: translateY(4px);
-    transition: opacity var(--transicion), transform var(--transicion);
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
 }
 
-.tarjeta:hover .tarjeta-add-grupo,
-.tarjeta-add-grupo:focus-within,
-.tarjeta-add-grupo.fijo {
-    opacity: 1;
-    transform: translateY(0);
-}
-
+/* Añadir va en contorno mientras está en reposo, para que veinte tarjetas no
+   compitan con el botón principal; el degradado llega al pasar o enfocar. */
 .tarjeta-add,
-.tarjeta-add-mas {
-    border: 0;
-    background: var(--ambar);
-    color: var(--sobre-ambar);
-    line-height: 1;
-    cursor: pointer;
+.tarjeta-add-mas,
+.tarjeta-abrir {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-    transition: background var(--transicion);
+    height: 40px;
+    border: 1px solid var(--linea-fuerte);
+    background: transparent;
+    color: var(--texto);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color var(--transicion), color var(--transicion);
 }
 
 .tarjeta-add {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    font-size: 1.25rem;
-    font-weight: 700;
+    flex: 1;
+    min-width: 0;
+    padding: 0 10px;
+    /* Botón partido de Material 3: 4px en las esquinas que se tocan. */
+    border-radius: 999px var(--radio-xs) var(--radio-xs) 999px;
 }
 
 .tarjeta-add-mas {
-    width: 24px;
-    height: 38px;
-    border-radius: 999px;
+    flex: none;
+    width: 34px;
+    border-radius: var(--radio-xs) 999px 999px var(--radio-xs);
     font-size: 0.75rem;
 }
 
-.tarjeta-add:hover,
-.tarjeta-add-mas:hover { background: var(--ambar-vivo); }
-
-.tarjeta-add[disabled] {
-    background: var(--fondo-3);
-    color: var(--ok);
-    cursor: default;
-    box-shadow: none;
+.tarjeta-abrir {
+    flex: 1;
+    padding: 0 12px;
+    border-radius: 999px;
 }
 
-/* Menú compartido de formato (override por resultado) */
+.tarjeta-add:not([disabled]):hover,
+.tarjeta-add:not([disabled]):focus-visible,
+.tarjeta-add-mas:hover,
+.tarjeta-add-mas:focus-visible,
+.tarjeta-abrir:hover,
+.tarjeta-abrir:focus-visible {
+    background: var(--degradado);
+    border-color: transparent;
+    color: var(--sobre-acento);
+}
+
+.tarjeta-add[disabled] {
+    border-color: var(--linea);
+    color: var(--ok);
+    cursor: default;
+}
+
+/* Menú compartido de formato (override por resultado): el mismo aspecto que
+   la lista de los desplegables. */
 .menu-formato {
     position: fixed;
     z-index: 60;
-    min-width: 190px;
-    padding: 5px;
-    border-radius: var(--radio);
-    border: 1px solid var(--linea-fuerte);
+    min-width: 200px;
+    padding: 6px;
+    border-radius: var(--radio-l);
+    border: 1px solid var(--linea);
     background: var(--fondo-3);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.6);
     display: none;
     flex-direction: column;
     gap: 2px;
@@ -718,21 +1098,22 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 .menu-formato button {
     display: flex;
     align-items: center;
-    gap: 9px;
-    padding: 9px 11px;
+    gap: 10px;
+    min-height: 40px;
+    padding: 0 16px 0 12px;
     border: 0;
     border-radius: var(--radio-s);
     background: transparent;
     color: var(--texto);
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     text-align: start;
     cursor: pointer;
 }
 
-.menu-formato button:hover { background: var(--fondo-2); }
-.menu-formato button svg { width: 16px; height: 16px; flex: none; color: var(--ambar); }
+.menu-formato button:hover { background: var(--campo-activo); }
+.menu-formato button svg { width: 18px; height: 18px; flex: none; color: var(--acento); }
 .menu-formato .mf-cabecera {
-    padding: 4px 11px 6px;
+    padding: 6px 12px;
     color: var(--texto-tenue);
     font-size: 0.75rem;
     font-weight: 600;
@@ -769,53 +1150,197 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 
 .cola-ajustes #carpeta-actual { font-weight: 600; }
 
-/* Segmentado Audio / Vídeo */
+/* Botón segmentado de Material 3 (Audio / Vídeo): un solo contorno,
+   segmentos separados por una línea y, en el elegido, el tinte del acento y
+   una marca en lugar de su icono. */
 .segmentado {
     display: inline-flex;
-    padding: 3px;
+    min-height: 40px;
     border-radius: 999px;
     border: 1px solid var(--linea-fuerte);
-    background: var(--fondo-2);
+    overflow: hidden;
 }
 
 .seg-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
+    gap: 8px;
+    padding: 0 16px;
     border: 0;
-    border-radius: 999px;
     background: transparent;
     color: var(--texto-suave);
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     font-weight: 600;
     cursor: pointer;
     transition: background var(--transicion), color var(--transicion);
 }
 
+.seg-btn + .seg-btn { border-left: 1px solid var(--linea-fuerte); }
+
+/* Dentro de un contorno recortado, el anillo de foco va por dentro. */
+.seg-btn:focus-visible { outline-offset: -3px; }
+
 .seg-btn[aria-pressed="true"] {
-    background: var(--ambar);
-    color: var(--sobre-ambar);
+    background: var(--acento-suave);
+    color: var(--texto);
 }
 
-.seg-btn:not([aria-pressed="true"]):hover { color: var(--texto); }
+.seg-btn[aria-pressed="true"] svg { display: none; }
 
+.seg-btn[aria-pressed="true"]::before {
+    content: "";
+    width: 9px;
+    height: 5px;
+    margin: 0 2px 3px;
+    border-left: 2px solid var(--acento);
+    border-bottom: 2px solid var(--acento);
+    rotate: -45deg;
+}
+
+.seg-btn:not([aria-pressed="true"]):hover {
+    background: var(--campo);
+    color: var(--texto);
+}
+
+/* Campo desplegable al estilo Material 3 «relleno»: la etiqueta va dentro,
+   arriba; debajo, el valor elegido; y por abajo, la línea indicadora, que
+   toma el acento al enfocar o al abrir. */
 .ajuste-calidad {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+    position: relative;
+    display: inline-grid;
     color: var(--texto-suave);
-    font-size: 0.875rem;
+}
+
+.ajuste-calidad > span {
+    position: absolute;
+    left: 14px;
+    top: 8px;
+    z-index: 1;
+    font-size: 0.6875rem;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    pointer-events: none; /* el clic es para el desplegable que hay debajo */
+    transition: color var(--transicion);
 }
 
 .ajuste-calidad select {
-    padding: 7px 10px;
-    border-radius: var(--radio-s);
-    border: 1px solid var(--linea-fuerte);
-    background: var(--fondo-2);
+    min-width: 150px;
+    min-height: 52px;
+    padding: 22px 12px 6px 14px;
+    border: 0;
+    border-bottom: 1px solid var(--linea-fuerte);
+    border-radius: var(--radio-xs) var(--radio-xs) 0 0;
+    background: var(--campo);
     color: var(--texto);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background var(--transicion), border-color var(--transicion),
+                box-shadow var(--transicion);
+}
+
+.ajuste-calidad select:hover { background: var(--campo-activo); }
+
+/* La flecha se centra en el campo entero, no en la línea del valor (que está
+   desplazada hacia abajo para dejar sitio a la etiqueta). */
+.ajuste-calidad select::picker-icon { translate: 0 -8px; }
+
+.ajuste-calidad select:focus-visible,
+.ajuste-calidad select:open {
+    border-bottom-color: var(--acento);
+    box-shadow: inset 0 -1px 0 var(--acento);
+}
+
+.ajuste-calidad:has(select:focus-visible) > span,
+.ajuste-calidad:has(select:open) > span { color: var(--acento); }
+
+/* Un filtro que acota (cualquier opción que no sea la primera) se tiñe con el
+   acento: de un vistazo se ve qué hay puesto. El orden no acota, así que no. */
+.filtros select:not(#filtro-orden):has(option:checked:not(:first-child)) {
+    background: var(--acento-suave);
+    border-bottom-color: var(--acento);
+}
+
+.filtros .ajuste-calidad:has(select:not(#filtro-orden) option:checked:not(:first-child)) > span {
+    color: var(--acento);
+}
+
+/* Desplegables: se renuncia al menú del sistema (appearance: base-select)
+   para poder dibujar la lista con el tema. El navegador sigue llevando el
+   teclado, el foco y la accesibilidad; donde no se admita, queda el nativo. */
+select,
+select::picker(select) {
+    appearance: base-select;
+}
+
+/* En este modo el desplegable es una caja flexible: sin centrar, el valor y
+   la flecha se quedan arriba (era lo que descolocaba el de la velocidad). */
+select {
+    align-items: center;
+    white-space: nowrap;
+}
+
+select::picker-icon {
+    color: var(--texto-suave);
+    transition: rotate 180ms ease;
+}
+
+select:open::picker-icon { rotate: 180deg; }
+
+/* La lista es un menú de Material 3: superficie elevada de esquinas amplias
+   que aparece con un fundido corto. */
+select::picker(select) {
+    margin-block: 6px;
+    padding: 6px;
+    border: 1px solid var(--linea);
+    border-radius: var(--radio-l);
+    background: var(--fondo-3);
+    color: var(--texto);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    translate: 0 -6px;
+    transition: opacity 140ms ease, translate 140ms ease,
+                overlay 140ms allow-discrete, display 140ms allow-discrete;
+}
+
+select::picker(select):popover-open {
+    opacity: 1;
+    translate: 0 0;
+}
+
+@starting-style {
+    select::picker(select):popover-open {
+        opacity: 0;
+        translate: 0 -6px;
+    }
+}
+
+select option {
+    min-height: 40px;
+    padding: 0 16px 0 10px;
+    border-radius: var(--radio-s);
+    gap: 10px;
+    color: var(--texto);
+    font-family: var(--fuente-cuerpo);
+    font-size: 0.875rem;
     cursor: pointer;
 }
+
+select option:hover { background: var(--campo-activo); }
+
+select option:focus-visible {
+    background: var(--campo-activo);
+    outline: 2px solid var(--acento);
+    outline-offset: -2px;
+}
+
+/* La opción elegida: tinte del acento y su marca, no solo un color. */
+select option:checked {
+    background: var(--acento-suave);
+    color: var(--acento);
+    font-weight: 600;
+}
+
+select option::checkmark { color: var(--acento); }
 
 .cola-acciones {
     display: flex;
@@ -835,7 +1360,7 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 .lote-grupo {
     border: 1px solid var(--linea);
     border-radius: var(--radio);
-    background: var(--fondo-1);
+    background: var(--superficie);
     margin-bottom: 12px;
     overflow: hidden;
 }
@@ -844,7 +1369,8 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 11px 14px;
+    min-height: 56px;
+    padding: 0 8px 0 16px;
     cursor: pointer;
     list-style: none;
     font-family: var(--fuente-rotulo);
@@ -868,7 +1394,7 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 
 .lote-grupo[open] summary::before { transform: rotate(45deg); }
 
-.lote-grupo summary:hover { background: var(--fondo-2); }
+.lote-grupo summary:hover { background: var(--campo); }
 
 .lote-contador {
     color: var(--texto-suave);
@@ -883,16 +1409,18 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     grid-template-columns: 52px minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 12px;
-    padding: 9px 14px;
+    min-height: 64px;
+    padding: 8px 8px 8px 16px;
     border-top: 1px solid var(--linea);
+    transition: background var(--transicion);
 }
 
-.cola-item:hover { background: var(--fondo-2); }
+.cola-item:hover { background: var(--campo); }
 
 .ci-thumb {
     width: 52px;
     height: 39px;
-    border-radius: 5px;
+    border-radius: var(--radio-xs);
     object-fit: cover;
     background: var(--fondo-2);
 }
@@ -900,7 +1428,7 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 .ci-thumb-icono {
     width: 52px;
     height: 39px;
-    border-radius: 5px;
+    border-radius: var(--radio-xs);
     background: var(--fondo-2);
     display: flex;
     align-items: center;
@@ -942,7 +1470,7 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     height: 100%;
     width: 0%;
     border-radius: inherit;
-    background: linear-gradient(90deg, var(--ambar), var(--ambar-vivo));
+    background: var(--degradado);
     transition: width 300ms linear;
 }
 
@@ -959,16 +1487,21 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 
 /* ------------------------- Vista: Biblioteca ---------------------------- */
 
+/* Mismo aire que la barra de búsqueda: píldora rellena, sin borde. */
 .biblioteca-filtro input {
     width: min(340px, 60vw);
-    padding: 9px 14px;
+    min-height: 44px;
+    padding: 0 18px;
+    border: 0;
     border-radius: 999px;
-    border: 1px solid var(--linea-fuerte);
-    background: var(--fondo-2);
+    background: var(--fondo-3);
     color: var(--texto);
+    transition: background var(--transicion);
 }
 
+.biblioteca-filtro input:hover { background: color-mix(in oklab, var(--fondo-3) 88%, white); }
 .biblioteca-filtro input::placeholder { color: var(--texto-tenue); }
+
 .biblioteca-filtro input:focus-visible { outline-offset: 0; }
 
 .carpetas-chips {
@@ -978,16 +1511,20 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     margin-bottom: 16px;
 }
 
+/* Chips de filtro de Material 3: esquinas de 8px (no píldora), contorno en
+   reposo y, elegidos, tinte del acento sin contorno. */
 .chip-carpeta {
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    padding: 5px 13px;
-    border-radius: 999px;
+    min-height: 32px;
+    padding: 0 14px;
+    border-radius: var(--radio-s);
     border: 1px solid var(--linea-fuerte);
-    background: var(--fondo-2);
+    background: transparent;
     color: var(--texto-suave);
     font-size: 0.8125rem;
+    font-weight: 600;
     cursor: pointer;
     transition: border-color var(--transicion), color var(--transicion),
                 background var(--transicion);
@@ -995,12 +1532,12 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 
 .chip-carpeta svg { width: 14px; height: 14px; flex: none; }
 
-.chip-carpeta:hover { border-color: var(--ambar); color: var(--ambar); }
+.chip-carpeta:hover { background: var(--campo); color: var(--texto); }
 
 .chip-carpeta[aria-pressed="true"] {
-    background: var(--ambar-suave);
-    border-color: var(--ambar);
-    color: var(--ambar);
+    background: var(--acento-suave);
+    border-color: transparent;
+    color: var(--acento);
 }
 
 .pista {
@@ -1008,26 +1545,31 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     grid-template-columns: 34px 42px minmax(0, 1fr) minmax(0, 0.6fr) 62px auto;
     align-items: center;
     gap: 12px;
-    padding: 7px 12px;
-    border-radius: var(--radio-s);
+    /* Fila de lista de Material 3 de dos líneas (densidad −2: 64px). */
+    min-height: 64px;
+    padding: 4px 8px 4px 16px;
+    border-radius: var(--radio);
     transition: background var(--transicion);
 }
 
-.pista:hover, .pista:focus-within { background: var(--fondo-2); }
+.pista:hover, .pista:focus-within { background: var(--campo); }
+
+/* La pista que suena: fila elegida, con el tinte del acento. */
+.pista.activa { background: var(--acento-suave); }
 
 .pista-num {
-    color: var(--texto-tenue);
+    color: var(--texto-suave); /* va sobre el resplandor: el terciario no llegaría a AA */
     font-family: var(--fuente-mono);
     font-size: 0.8125rem;
     text-align: right;
 }
 
 .pista-play {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
     border: 0;
     border-radius: 50%;
-    background: var(--fondo-3);
+    background: var(--campo-activo);
     color: var(--texto);
     cursor: pointer;
     display: inline-flex;
@@ -1039,8 +1581,8 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 .pista-play svg { width: 17px; height: 17px; }
 
 .pista-play:hover {
-    background: var(--ambar);
-    color: var(--sobre-ambar);
+    background: var(--degradado-diagonal);
+    color: var(--sobre-acento);
 }
 
 .pista-info { min-width: 0; }
@@ -1080,7 +1622,7 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     display: inline-block;
     margin-right: 7px;
     padding: 0 6px;
-    border-radius: 4px;
+    border-radius: var(--radio-xs);
     border: 1px solid var(--linea-fuerte);
     color: var(--texto-suave);
     font-family: var(--fuente-rotulo);
@@ -1089,11 +1631,11 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     vertical-align: 1px;
 }
 
-.pista.activa .pista-titulo { color: var(--ambar); }
+.pista.activa .pista-titulo { color: var(--acento); }
 
 .pista.activa .pista-play {
-    background: var(--ambar);
-    color: var(--sobre-ambar);
+    background: var(--degradado-diagonal);
+    color: var(--sobre-acento);
 }
 
 .pista-acciones {
@@ -1115,11 +1657,13 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 12px;
     align-items: center;
-    padding: 10px 12px;
-    border-radius: var(--radio-s);
+    min-height: 64px;
+    padding: 4px 8px 4px 16px;
+    border-radius: var(--radio);
+    transition: background var(--transicion);
 }
 
-.hist-item:hover { background: var(--fondo-2); }
+.hist-item:hover { background: var(--campo); }
 
 .hist-titulo {
     font-weight: 600;
@@ -1138,7 +1682,7 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 }
 
 .hist-fecha {
-    color: var(--texto-tenue);
+    color: var(--texto-suave); /* va sobre el resplandor: el terciario no llegaría a AA */
     font-family: var(--fuente-mono);
     font-size: 0.8125rem;
     white-space: nowrap;
@@ -1153,9 +1697,45 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     gap: 18px;
     height: var(--reproductor-alto);
     padding: 0 18px;
+    position: relative;
     background: var(--fondo-1);
-    border-top: 1px solid var(--linea);
+    /* La línea la pinta ::before; este borde solo se ve con colores forzados. */
+    border-top: 1px solid transparent;
 }
+
+/* Firma visual: el horizonte. La barra de reproducción es el suelo; por su
+   borde corre una línea con el degradado y de ella sube un resplandor tenue
+   que se aviva mientras suena algo (lo delata el ecualizador activo). */
+.reproductor::before,
+.reproductor::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    pointer-events: none;
+    transition: opacity 700ms ease;
+}
+
+.reproductor::before {
+    top: -1px;
+    height: 1px;
+    background: var(--degradado);
+    opacity: 0.5;
+}
+
+.reproductor::after {
+    bottom: 100%;
+    height: 150px;
+    background:
+        radial-gradient(58% 100% at 26% 100%,
+            color-mix(in oklab, var(--acento-a) 26%, transparent), transparent 72%),
+        radial-gradient(58% 100% at 74% 100%,
+            color-mix(in oklab, var(--acento-b) 26%, transparent), transparent 72%);
+    opacity: 0.28;
+}
+
+.reproductor:has(.eq.activo)::before,
+.reproductor:has(.eq.activo)::after { opacity: 1; }
 
 /* ----------------------- Escenario de vídeo ----------------------------- */
 
@@ -1201,8 +1781,8 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 }
 
 .ev-barra .btn-icono[aria-pressed="true"] {
-    color: var(--ambar);
-    background: var(--ambar-suave);
+    color: var(--acento);
+    background: var(--acento-suave);
 }
 
 .ev-titulo {
@@ -1258,7 +1838,7 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     height: 38px;
     margin: -19px 0 0 -19px;
     border: 3px solid rgba(255, 255, 255, 0.3);
-    border-top-color: var(--ambar);
+    border-top-color: var(--acento);
     border-radius: 50%;
     animation: girar 0.8s linear infinite;
     pointer-events: none;
@@ -1304,6 +1884,65 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 .escenario-video.es-previa .ev-marco { border-radius: 0; }
 .escenario-video.es-previa .ev-controles { display: none; }
 
+/* Reproductor propio de la vista previa: entra cuando YouTube se niega a
+   reproducir el vídeo incrustado. Lleva lo justo: pausa, posición y tiempo. */
+.previa-video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+    cursor: pointer;
+}
+
+.previa-controles {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 26px 12px 8px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.86) 30%, rgba(0, 0, 0, 0));
+    color: #fff;
+}
+
+.previa-controles .btn-icono { flex: none; color: #fff; }
+.previa-controles .btn-icono:hover { background: rgba(255, 255, 255, 0.18); }
+
+.previa-controles input[type="range"] {
+    flex: 1;
+    min-width: 0;
+}
+
+.previa-controles input[type="range"]::-webkit-slider-runnable-track {
+    background: linear-gradient(90deg in oklab,
+        var(--acento-a),
+        var(--acento-b) var(--pct),
+        rgba(255, 255, 255, 0.3) var(--pct));
+}
+
+.previa-controles input[type="range"]::-webkit-slider-thumb {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+/* Cuando no hay forma de verlo aquí: el motivo y la salida a YouTube. */
+.previa-aviso {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 18px 22px;
+    color: var(--texto);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    text-align: center;
+}
+
 .ev-pie {
     display: flex;
     gap: 12px;
@@ -1316,7 +1955,8 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 
 .ev-pie .btn {
     flex: none;
-    padding: 6px 12px;
+    min-height: 32px;
+    padding: 0 16px;
     font-size: 0.8125rem;
 }
 
@@ -1373,21 +2013,25 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 /* Sobre el vídeo el fondo de los deslizadores es claro y translúcido; el de
    posición enseña además cuánto hay ya cargado (--buf). */
 .ev-controles input[type="range"]::-webkit-slider-runnable-track {
-    background: linear-gradient(90deg,
-        var(--ambar) var(--pct),
+    background: linear-gradient(90deg in oklab,
+        var(--acento-a),
+        var(--acento-b) var(--pct),
         rgba(255, 255, 255, 0.3) var(--pct));
 }
 
 .ev-controles .ev-seek::-webkit-slider-runnable-track {
-    background: linear-gradient(90deg,
-        var(--ambar) var(--pct),
+    background: linear-gradient(90deg in oklab,
+        var(--acento-a),
+        var(--acento-b) var(--pct),
         rgba(255, 255, 255, 0.6) var(--pct),
         rgba(255, 255, 255, 0.6) var(--buf, 0%),
         rgba(255, 255, 255, 0.3) var(--buf, 0%));
 }
 
 .ev-velocidad {
-    padding: 4px 6px;
+    min-height: 32px;
+    padding: 0 8px 0 12px;
+    gap: 4px;
     border-radius: var(--radio-s);
     border: 1px solid rgba(255, 255, 255, 0.4);
     background: rgba(0, 0, 0, 0.5);
@@ -1395,6 +2039,26 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     font-family: var(--fuente-mono);
     font-size: 0.75rem;
     cursor: pointer;
+}
+
+.ev-velocidad::picker-icon { color: #fff; }
+
+/* Su menú va compacto y se abre hacia arriba, alineado al borde derecho: el
+   selector vive en la esquina inferior del vídeo y la ventana puede ser muy
+   pequeña, así que a tamaño normal lo taparía todo. */
+.ev-velocidad::picker(select) {
+    position-area: block-start span-inline-start;
+    min-width: 96px;
+    padding: 4px;
+    border-radius: var(--radio);
+}
+
+.ev-velocidad option {
+    min-height: 32px;
+    padding: 0 12px 0 8px;
+    border-radius: var(--radio-s);
+    font-family: var(--fuente-mono);
+    font-size: 0.8125rem;
 }
 
 /* Ventana estrecha: primero sobra el deslizador de volumen (queda el botón
@@ -1542,7 +2206,7 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     text-overflow: ellipsis;
 }
 
-/* Firma: ecualizador ámbar (solo anima cuando .activo y sin reduced-motion) */
+/* Ecualizador con el degradado (solo anima cuando .activo y sin reduced-motion) */
 .eq {
     display: flex;
     align-items: flex-end;
@@ -1559,7 +2223,7 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
     width: 3px;
     height: 30%;
     border-radius: 2px;
-    background: var(--ambar);
+    background: linear-gradient(to top in oklab, var(--acento-a), var(--acento-b));
 }
 
 .eq.activo span { animation: eq-salto 0.9s ease-in-out infinite; }
@@ -1587,21 +2251,23 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 }
 
 .btn-play {
-    width: 42px;
-    height: 42px;
-    background: var(--texto);
-    color: var(--fondo-0);
+    width: 48px;
+    height: 48px;
+    background: var(--degradado-diagonal);
+    color: var(--sobre-acento);
+    transition: filter var(--transicion);
 }
 
 .btn-play:hover {
-    background: var(--ambar);
-    color: var(--sobre-ambar);
+    background: var(--degradado-diagonal);
+    color: var(--sobre-acento);
+    filter: brightness(1.12);
 }
 
 #btn-aleatorio[aria-pressed="true"],
 #btn-repetir[aria-pressed="true"] {
-    color: var(--ambar);
-    background: var(--ambar-suave);
+    color: var(--acento);
+    background: var(--acento-suave);
 }
 
 #btn-repetir { position: relative; }
@@ -1642,11 +2308,13 @@ main:focus-visible { outline: none; } /* destino del salto: el anillo aquí no a
 
 .volumen-icono { color: var(--texto-suave); flex: none; }
 
-/* Sliders (seek + volumen): pista con relleno ámbar vía --pct (lo fija JS) */
+/* Sliders (seek + volumen) con aire de Material 3: pista gruesa de extremos
+   redondos y, por tirador, una barrita vertical separada de la pista por un
+   hueco. El tramo recorrido lleva el degradado, de 0 a --pct (lo fija JS). */
 input[type="range"] {
     -webkit-appearance: none;
     appearance: none;
-    height: 18px;
+    height: 20px;
     background: transparent;
     cursor: pointer;
     --pct: 0%;
@@ -1658,54 +2326,66 @@ input[type="range"]:disabled { cursor: default; opacity: 0.5; }
 #volumen { width: 100px; }
 
 input[type="range"]::-webkit-slider-runnable-track {
-    height: 4px;
+    height: 6px;
     border-radius: 999px;
-    background: linear-gradient(90deg,
-        var(--ambar) var(--pct),
+    background: linear-gradient(90deg in oklab,
+        var(--acento-a),
+        var(--acento-b) var(--pct),
         var(--fondo-3) var(--pct));
 }
 
 input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 12px;
-    height: 12px;
-    margin-top: -4px;
-    border-radius: 50%;
-    background: var(--texto);
+    width: 4px;
+    height: 18px;
+    margin-top: -6px;
     border: 0;
-    opacity: 0;
-    transition: opacity var(--transicion);
+    border-radius: 999px;
+    background: var(--texto);
+    /* El hueco entre el tirador y la pista: un contorno del color del fondo. */
+    box-shadow: 0 0 0 3px var(--fondo-1);
+    transition: width var(--transicion);
 }
 
-input[type="range"]:hover::-webkit-slider-thumb,
-input[type="range"]:focus-visible::-webkit-slider-thumb {
-    opacity: 1;
+/* Al arrastrar, el tirador se afina (como en Material 3). */
+input[type="range"]:active::-webkit-slider-thumb { width: 2px; }
+
+/* Sin pista que recorrer no hay tirador que enseñar. */
+input[type="range"]:disabled::-webkit-slider-thumb { opacity: 0; }
+
+/* Sobre el vídeo no hay un fondo liso con el que abrir el hueco. */
+.ev-controles input[type="range"]::-webkit-slider-thumb {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
 /* --------------------------- Diálogo modal ------------------------------ */
 
+/* Diálogo básico de Material 3: superficie elevada sin borde, esquinas de
+   28px, 24px de aire y el título en grande. */
 dialog {
     width: min(480px, 92vw);
     max-height: min(600px, 86vh);
-    padding: 20px;
-    border: 1px solid var(--linea-fuerte);
-    border-radius: 14px;
-    background: var(--fondo-1);
+    padding: 24px;
+    border: 0;
+    border-radius: var(--radio-xl);
+    background: var(--fondo-3);
     color: var(--texto);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
     display: none;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
 }
 
 dialog[open] { display: flex; }
 
-dialog::backdrop { background: rgba(8, 6, 4, 0.66); }
+dialog::backdrop { background: var(--velo); }
 
 dialog h2 {
     font-family: var(--fuente-rotulo);
-    font-size: 1.125rem;
-    letter-spacing: 0.03em;
+    font-size: 1.5rem;
+    line-height: 1.25;
+    letter-spacing: 0.02em;
 }
 
 /* Diálogo de confirmación: más compacto que el explorador de carpetas. */
@@ -1734,8 +2414,9 @@ dialog h2 {
     overflow-y: auto;
     min-height: 120px;
     max-height: 280px;
-    border: 1px solid var(--linea);
-    border-radius: var(--radio-s);
+    padding: 4px;
+    border-radius: var(--radio);
+    background: var(--fondo-2);
     scrollbar-width: thin;
     scrollbar-color: var(--linea-fuerte) transparent;
 }
@@ -1743,24 +2424,25 @@ dialog h2 {
 .dlg-item {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     width: 100%;
-    padding: 9px 12px;
+    min-height: 48px;
+    padding: 0 16px;
     background: none;
     border: 0;
-    border-bottom: 1px solid var(--linea);
+    border-radius: var(--radio-s);
     color: var(--texto);
     text-align: start;
     cursor: pointer;
+    transition: background var(--transicion);
 }
 
-.dlg-item:last-child { border-bottom: 0; }
-.dlg-item:hover { background: var(--fondo-2); }
+.dlg-item:hover { background: var(--campo-activo); }
 .dlg-item svg {
     width: 18px;
     height: 18px;
     flex: none;
-    color: var(--ambar);
+    color: var(--acento);
 }
 
 .dlg-vacio {
@@ -1775,14 +2457,27 @@ dialog h2 {
     gap: 8px;
 }
 
+/* Campo de texto «con contorno» de Material 3: al enfocar, el contorno
+   engorda y toma el acento. */
 .dlg-nueva input {
     flex: 1;
     min-width: 0;
-    padding: 8px 12px;
-    border-radius: var(--radio-s);
+    min-height: 42px;
+    padding: 0 14px;
     border: 1px solid var(--linea-fuerte);
-    background: var(--fondo-2);
+    border-radius: var(--radio-xs);
+    background: transparent;
     color: var(--texto);
+    transition: border-color var(--transicion), box-shadow var(--transicion);
+}
+
+.dlg-nueva input::placeholder { color: var(--texto-tenue); }
+.dlg-nueva input:hover { border-color: var(--texto-suave); }
+
+.dlg-nueva input:focus-visible {
+    outline: none; /* lo sustituye el contorno de 2px del acento */
+    border-color: var(--acento);
+    box-shadow: inset 0 0 0 1px var(--acento);
 }
 
 .dlg-pie {
@@ -1794,41 +2489,54 @@ dialog h2 {
 
 /* ------------------------------ Avisos ---------------------------------- */
 
+/* Avisos al estilo «snackbar» de Material 3: superficie inversa (clara sobre
+   la app oscura), esquinas de 4px, abajo y centrados para no tapar la ventana
+   de vídeo. El contenedor es un popover manual: vive en la capa superior del
+   navegador, así que se ve también sobre un diálogo o a pantalla completa. */
 .avisos {
     position: fixed;
-    right: 16px;
-    bottom: calc(var(--reproductor-alto) + 14px);
-    z-index: 50;
+    inset: auto auto calc(var(--reproductor-alto) + 16px) 50%;
+    translate: -50% 0;
+    width: max-content;
+    max-width: min(560px, calc(100vw - 32px));
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    overflow: visible;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 8px;
-    max-width: 340px;
+    pointer-events: none;
 }
+
+/* El display de arriba pisaría el «oculto» que el navegador da a un popover
+   cerrado. */
+.avisos:not(:popover-open) { display: none; }
 
 .aviso {
     display: flex;
-    gap: 9px;
-    align-items: flex-start;
-    padding: 11px 14px;
-    border-radius: var(--radio);
-    background: var(--fondo-3);
-    border: 1px solid var(--linea-fuerte);
-    color: var(--texto);
+    gap: 12px;
+    align-items: center;
+    min-height: 48px;
+    padding: 8px 16px;
+    border-radius: var(--radio-xs);
+    background: var(--inverso);
+    color: var(--sobre-inverso);
     font-size: 0.875rem;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    line-height: 1.4;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
     animation: aviso-entra 220ms ease;
 }
 
 .aviso.saliendo { opacity: 0; transition: opacity 350ms ease; }
 
-.aviso-icono { flex: none; margin-top: 1px; font-weight: 700; }
+.aviso-icono { flex: none; font-weight: 700; }
 
-.aviso-ok    { border-color: var(--ok); }
-.aviso-ok    .aviso-icono { color: var(--ok); }
-.aviso-error { border-color: var(--error); }
-.aviso-error .aviso-icono { color: var(--error); }
-.aviso-info  { border-color: var(--ambar); }
-.aviso-info  .aviso-icono { color: var(--ambar); }
+.aviso-ok    .aviso-icono { color: var(--ok-inverso); }
+.aviso-error .aviso-icono { color: var(--error-inverso); }
 
 @keyframes aviso-entra {
     from { opacity: 0; transform: translateY(8px); }
@@ -1848,9 +2556,19 @@ dialog h2 {
 
     .marca-nombre,
     .nav-item span:not(.nav-badge),
-    .sidebar-pie { display: none; }
+    .sidebar-pie > :not(.temas),
+    .temas legend { display: none; }
 
-    .nav-item { justify-content: center; padding: 12px 0; }
+    /* Del pie solo cabe el selector de tema, con las muestras en columna. */
+    .sidebar-pie { padding: 0; }
+    .temas {
+        flex-direction: column;
+        flex-wrap: nowrap;
+        gap: 8px;
+        padding: 12px 0 2px;
+    }
+
+    .nav-item { justify-content: center; min-height: 40px; padding: 0; }
     .nav-badge {
         position: absolute;
         transform: translate(14px, -12px);
@@ -1871,6 +2589,18 @@ dialog h2 {
 
     .pista { grid-template-columns: 42px minmax(0, 1fr) 62px auto; }
     .pista-num, .pista-album { display: none; }
+}
+
+/* --------------------------- Colores forzados --------------------------- */
+
+/* En el modo de alto contraste de Windows desaparecen los degradados y las
+   sombras: lo que se apoyaba en ellos recupera un borde de verdad. */
+@media (forced-colors: active) {
+    .reproductor { border-top-color: CanvasText; }
+    .escenario-video { outline: 1px solid CanvasText; }
+    .nav-item[aria-current="page"] { outline: 1px solid Highlight; }
+    .tema:has(:checked) { outline-color: Highlight; }
+    input[type="range"]::-webkit-slider-thumb { opacity: 1; }
 }
 
 /* ------------------------- Movimiento reducido --------------------------- */

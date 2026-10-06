@@ -14,6 +14,8 @@ import pytest
 import sonora.servicios.descargas as descargas
 import sonora.servicios.youtube as youtube
 from sonora import db
+from sonora.api.config import TEMAS
+from sonora.paths import RUTA_RECURSOS
 
 
 @pytest.fixture(autouse=True)
@@ -56,6 +58,19 @@ class TestBuscar:
         assert datos["resultados"] == resultados
         assert datos["es_playlist"] is False
         assert llamadas == {"q": "beatles", "n": 5}
+
+    def test_los_filtros_llegan_al_servicio(self, client, monkeypatch):
+        llamadas = {}
+
+        def falso_buscar(q, n, filtros=None):
+            llamadas["filtros"] = filtros
+            return []
+
+        monkeypatch.setattr(youtube, "buscar", falso_buscar)
+        filtros = {"orden": "recientes", "fecha": "mes", "caracteristicas": ["4k"]}
+        respuesta = client.post("/api/buscar", json={"q": "beatles", "filtros": filtros})
+        assert respuesta.status_code == 200
+        assert llamadas["filtros"] == filtros
 
 
 # --------------------------------------------------------------------------- #
@@ -272,6 +287,43 @@ class TestConfig:
     def test_volumen_se_acota_entre_0_y_1(self, client, enviado, guardado):
         client.post("/api/config", json={"volumen": enviado})
         assert client.get("/api/config").get_json()["volumen"] == guardado
+
+    def test_orden_de_busqueda_se_recuerda(self, client):
+        assert client.get("/api/config").get_json()["busqueda_orden"] == "relevancia"
+        client.post("/api/config", json={"busqueda_orden": "recientes"})
+        assert client.get("/api/config").get_json()["busqueda_orden"] == "recientes"
+        client.post("/api/config", json={"busqueda_orden": "al azar"})
+        assert client.get("/api/config").get_json()["busqueda_orden"] == "relevancia"
+
+    def test_tema_por_defecto_y_cambio(self, client):
+        assert client.get("/api/config").get_json()["tema"] == "ocaso"
+        client.post("/api/config", json={"tema": "buganvilla"})
+        assert client.get("/api/config").get_json()["tema"] == "buganvilla"
+
+    @pytest.mark.parametrize("tema", ["fucsia", "", None, 3, ["luna"]])
+    def test_tema_invalido_cae_al_de_fabrica(self, client, tema):
+        client.post("/api/config", json={"tema": "luna"})
+        client.post("/api/config", json={"tema": tema})
+        assert client.get("/api/config").get_json()["tema"] == "ocaso"
+
+    @pytest.mark.parametrize("tema", TEMAS)
+    def test_cada_tema_tiene_su_degradado_y_su_muestra(self, tema):
+        # Un tema que el backend acepta pero la interfaz no define dejaría la
+        # app con el acento de fábrica sin avisar.
+        css = (RUTA_RECURSOS / "static" / "css" / "estilo.css").read_text(encoding="utf-8")
+        html = (RUTA_RECURSOS / "templates" / "index.html").read_text(encoding="utf-8")
+        for sufijo in ("-a", "-b", ""):
+            assert f"--{tema}{sufijo}: #" in css
+        assert f'.tema[data-tema="{tema}"]' in css
+        assert f'name="tema" autocomplete="off" value="{tema}"' in html
+        if tema != TEMAS[0]:
+            assert f':root[data-tema="{tema}"]' in css
+
+    def test_la_pagina_abre_ya_con_el_tema_guardado(self, client):
+        # El tema va en el HTML: aplicarlo desde JS haría parpadear la ventana.
+        assert b'<html lang="es" data-tema="ocaso">' in client.get("/").data
+        client.post("/api/config", json={"tema": "cobre"})
+        assert b'<html lang="es" data-tema="cobre">' in client.get("/").data
 
     def test_modo_de_video_invalido_cae_a_flotante(self, client):
         client.post("/api/config", json={"video_modo": "teatro"})

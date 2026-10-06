@@ -2,8 +2,8 @@
 
 **Sonora** es una **app de escritorio** (ventana propia, no el navegador) para
 descargar música de YouTube a **MP3 de alta calidad** y reproducirla desde tu
-propia biblioteca local. Interfaz oscura tipo Spotify/YouTube Music, con tres
-piezas en una sola ventana:
+propia biblioteca local. Interfaz negra con el acento en degradado (nueve
+temas de color a elegir), con tres piezas en una sola ventana:
 
 - 🔎 **Buscador integrado** de YouTube (texto, URLs, playlists y canales).
 - ⬇️ **Gestor de descargas** a MP3 (hasta 320 kbps) con progreso en vivo,
@@ -49,7 +49,9 @@ Guía detallada en [docs/instalacion.md](docs/instalacion.md).
 ## ✨ Funciones
 
 - 🔎 **Buscador integrado**: busca por canción o artista, o pega una URL de
-  vídeo, **playlist**, **canal** o **Mix** de YouTube.
+  vídeo, **playlist**, **canal** o **Mix** de YouTube. Con **filtros** como
+  los de YouTube: orden (también por más recientes), fecha de subida,
+  duración, tipo y características (4K, HD, subtítulos…).
 - 📥 **Cola persistente**: sobrevive al reinicio (SQLite). Elige carpeta de
   destino y calidad; las preferencias **se recuerdan**.
 - 🚦 **Gestión completa de descargas**: progreso en vivo por canción,

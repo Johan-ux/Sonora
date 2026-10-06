@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 import re
+from urllib.parse import quote, quote_plus
 
 # Si falta yt-dlp, el ImportError se propaga hasta el punto de entrada
 # (sonora.escritorio / sonora.cli), que es quien sabe mostrar el error al
@@ -15,6 +17,53 @@ from ..utils import formatear_duracion, thumbnail_desde_id
 # Tope de seguridad de canciones que se traen al expandir una playlist.
 # Generoso para cubrir playlists grandes; luego se descargan en lotes pequeños.
 MAX_PLAYLIST = 1000
+
+# ---------------------------------------------------------------------------
+# Filtros de búsqueda
+#
+# YouTube los recibe en el parámetro ``sp`` de la URL de resultados: un mensaje
+# protobuf en base64 con el orden (campo 1) y un submensaje de filtros (campo
+# 2). Los números de campo y sus valores están comprobados contra el servicio.
+#
+# Lo que NO está aquí es a propósito: YouTube ya no ordena por fecha de subida
+# (acepta el parámetro y lo ignora), así que «recientes» lo ordenamos nosotros;
+# y se dejan fuera las películas (de pago) y los filtros que exigen una cuenta.
+#
+# Los directos sí se pueden buscar: no se descargan mientras duran (lo impide
+# ``descargas._rechazar_directos``), pero se ven en la vista previa de la app.
+# ---------------------------------------------------------------------------
+
+ORDENES = ("relevancia", "recientes", "popularidad")
+_SP_ORDEN = {"popularidad": 3}
+FECHAS = {"hoy": 2, "semana": 3, "mes": 4, "anio": 5}
+TIPOS = {"video": 1, "canal": 2, "lista": 3}
+# Los cortes son los de YouTube: menos de 4 min, de 4 a 20 y más de 20.
+DURACIONES = {"corta": 1, "media": 3, "larga": 2}
+CARACTERISTICAS = {
+    "directo": 8,
+    "hd": 4,
+    "subtitulos": 5,
+    "cc": 6,
+    "3d": 7,
+    "4k": 14,
+    "360": 15,
+    "hdr": 25,
+    "vr180": 26,
+}
+
+FILTROS_POR_DEFECTO = {
+    "orden": "relevancia",
+    "fecha": "",
+    "duracion": "",
+    "tipo": "video",
+    "caracteristicas": [],
+}
+
+# Para ordenar por fecha hace falta margen: se piden estos y luego se recorta.
+RESULTADOS_PARA_ORDENAR = 50
+# Entre los resultados se cuelan entradas de otro tipo (el canal del artista,
+# un Mix…) que se descartan; se piden unas cuantas de más para compensar.
+_MARGEN_DESCARTES = 6
 
 
 def es_url(texto: str) -> bool:
@@ -41,6 +90,70 @@ def es_url_canal(texto: str) -> bool:
     if "list=" in t or "/playlist" in t:
         return False
     return ("/@" in t) or ("/channel/" in t) or ("/c/" in t) or ("/user/" in t)
+
+
+def normalizar_filtros(filtros: object) -> dict:
+    """Devuelve los filtros con todas sus claves y solo valores conocidos.
+
+    Tolerante: lo que no se reconoce (o no viene) cae a su valor por defecto,
+    de modo que un cliente antiguo que no manda filtros busca como siempre.
+    """
+    datos = filtros if isinstance(filtros, dict) else {}
+
+    def elegir(clave: str, validos, por_defecto: str) -> str:
+        # isinstance antes que 'in': una lista no se puede buscar en un dict.
+        valor = datos.get(clave)
+        return valor if isinstance(valor, str) and valor in validos else por_defecto
+
+    marcadas = datos.get("caracteristicas")
+    if not isinstance(marcadas, (list, tuple)):
+        marcadas = []
+    return {
+        "orden": elegir("orden", ORDENES, "relevancia"),
+        "fecha": elegir("fecha", FECHAS, ""),
+        "duracion": elegir("duracion", DURACIONES, ""),
+        "tipo": elegir("tipo", TIPOS, "video"),
+        "caracteristicas": sorted(
+            {c for c in marcadas if isinstance(c, str) and c in CARACTERISTICAS}
+        ),
+    }
+
+
+def _varint(numero: int) -> bytes:
+    """Codifica un entero como varint de protobuf."""
+    octetos = bytearray()
+    while True:
+        bajo = numero & 0x7F
+        numero >>= 7
+        if numero:
+            octetos.append(bajo | 0x80)
+        else:
+            octetos.append(bajo)
+            return bytes(octetos)
+
+
+def _campo(numero: int, valor: int) -> bytes:
+    """Campo protobuf de tipo varint: su etiqueta seguida del valor."""
+    return _varint(numero << 3) + _varint(valor)
+
+
+def parametro_sp(filtros: dict) -> str:
+    """Construye el parámetro ``sp`` de YouTube para unos filtros normalizados."""
+    campos = {2: TIPOS[filtros["tipo"]]}
+    if filtros["fecha"]:
+        campos[1] = FECHAS[filtros["fecha"]]
+    if filtros["duracion"]:
+        campos[3] = DURACIONES[filtros["duracion"]]
+    for caracteristica in filtros["caracteristicas"]:
+        campos[CARACTERISTICAS[caracteristica]] = 1
+    cuerpo = b"".join(_campo(numero, valor) for numero, valor in sorted(campos.items()))
+    mensaje = b""
+    orden = _SP_ORDEN.get(filtros["orden"])
+    if orden:
+        mensaje += _campo(1, orden)
+    # Campo 2, tipo «longitud delimitada»: el submensaje con los filtros.
+    mensaje += _varint((2 << 3) | 2) + _varint(len(cuerpo)) + cuerpo
+    return base64.b64encode(mensaje).decode("ascii")
 
 
 def _entrada_a_resultado(entrada: dict) -> dict:
@@ -71,6 +184,65 @@ def _entrada_a_resultado(entrada: dict) -> dict:
         ),
         "duracion": formatear_duracion(entrada.get("duration")),
         "thumbnail": thumbnail,
+        "tipo": "video",
+        # Fecha de subida (segundos Unix). En las búsquedas es aproximada: sale
+        # del «hace 3 meses» que enseña YouTube. None si no se conoce.
+        "timestamp": entrada.get("timestamp"),
+        "directo": _estado_directo(entrada),
+    }
+
+
+def _estado_directo(entrada: dict) -> str:
+    """Estado de emisión de un vídeo: 'en_vivo', 'programado', 'terminado' o ''.
+
+    La interfaz lo necesita para decidir qué ofrecer: un directo en curso (o
+    por empezar) se puede ver pero no descargar; uno terminado es ya un vídeo
+    como cualquier otro.
+    """
+    estado = entrada.get("live_status")
+    if estado == "is_live" or entrada.get("is_live"):
+        return "en_vivo"
+    if estado == "is_upcoming":
+        return "programado"
+    if estado in ("was_live", "post_live") or entrada.get("was_live"):
+        return "terminado"
+    return ""
+
+
+def _tipo_de_entrada(entrada: dict) -> str:
+    """Clasifica un resultado de búsqueda: 'video', 'lista' o 'canal'."""
+    url = (entrada.get("url") or "").lower()
+    if es_url_playlist(url):
+        return "lista"
+    if es_url_canal(url):
+        return "canal"
+    return "video"
+
+
+def _coleccion_a_resultado(entrada: dict, tipo: str) -> dict:
+    """Normaliza una lista o un canal encontrados en una búsqueda.
+
+    No son descargables tal cual: la interfaz los abre volviendo a buscar por
+    su URL, que es el camino de siempre para expandir playlists y canales.
+    """
+    thumbnail = ""
+    thumbs = entrada.get("thumbnails") or []
+    if isinstance(thumbs, list) and thumbs and isinstance(thumbs[-1], dict):
+        thumbnail = thumbs[-1].get("url", "")
+    if thumbnail.startswith("//"):
+        # Los avatares de canal llegan sin esquema.
+        thumbnail = "https:" + thumbnail
+    nombre_canal = entrada.get("channel") or entrada.get("uploader") or ""
+    return {
+        "id": "",
+        "url": entrada.get("url") or "",
+        "titulo": entrada.get("title") or nombre_canal or "(sin título)",
+        # En un canal el título ya es su nombre: debajo va su identificador.
+        "canal": (entrada.get("uploader_id") or "") if tipo == "canal" else nombre_canal,
+        "duracion": "",
+        "thumbnail": thumbnail,
+        "tipo": tipo,
+        "timestamp": None,
     }
 
 
@@ -90,19 +262,77 @@ def _opciones_extraccion(flat: bool) -> dict:
     return opciones
 
 
-def buscar_ytsearch(consulta: str, n: int) -> list[dict]:
-    """Búsqueda rápida (flat) ``ytsearchN:<consulta>``."""
+def _acotar_n(n: int) -> int:
+    """Número de resultados pedido, entre 1 y 50 (12 si no es un número)."""
     try:
-        n = max(1, min(int(n or 12), 50))
+        return max(1, min(int(n or 12), 50))
     except (TypeError, ValueError):
-        n = 12
+        return 12
+
+
+def _opciones_busqueda() -> dict:
+    """Opciones de yt-dlp para una búsqueda (flat, con fecha aproximada)."""
     opciones = _opciones_extraccion(flat=True)
     opciones["noplaylist"] = True
+    # Sin esto los resultados no traen fecha. Con ello yt-dlp la deduce del
+    # «hace 3 meses» de YouTube: aproximada, pero basta para ordenar y enseñar.
+    opciones["extractor_args"] = {"youtubetab": {"approximate_date": [""]}}
+    return opciones
+
+
+def buscar(consulta: str, n: int, filtros: object = None) -> list[dict]:
+    """Busca por texto aplicando los filtros (orden, fecha, duración, tipo…).
+
+    Sin filtros delega en ``buscar_ytsearch``, el camino de siempre. Con ellos
+    usa la URL de resultados de YouTube con su parámetro ``sp``.
+
+    «Más recientes» no existe ya en YouTube: se piden más resultados de los
+    necesarios y se ordenan aquí por su fecha aproximada. No es, por tanto,
+    «lo último subido a YouTube», sino lo más nuevo entre lo más relevante;
+    combinado con el filtro de fecha sí acota de verdad.
+    """
+    f = normalizar_filtros(filtros)
+    if f == FILTROS_POR_DEFECTO:
+        return buscar_ytsearch(consulta, n)
+    n = _acotar_n(n)
+    recientes = f["orden"] == "recientes"
+    url = (
+        "https://www.youtube.com/results?search_query="
+        + quote_plus(consulta)
+        + "&sp="
+        + quote(parametro_sp(f))
+    )
+    opciones = _opciones_busqueda()
+    opciones["playlistend"] = (
+        max(RESULTADOS_PARA_ORDENAR, n) if recientes else n + _MARGEN_DESCARTES
+    )
+    with yt_dlp.YoutubeDL(opciones) as ydl:
+        info = ydl.extract_info(url, download=False)
+    resultados: list[dict] = []
+    for entrada in (info or {}).get("entries", []) or []:
+        if not entrada or _tipo_de_entrada(entrada) != f["tipo"]:
+            continue
+        if f["tipo"] == "video":
+            resultados.append(_entrada_a_resultado(entrada))
+        else:
+            resultados.append(_coleccion_a_resultado(entrada, f["tipo"]))
+    if recientes:
+        # Orden estable: lo que no trae fecha se queda al final, en su orden.
+        resultados.sort(key=lambda r: r["timestamp"] or 0, reverse=True)
+    return resultados[:n]
+
+
+def buscar_ytsearch(consulta: str, n: int) -> list[dict]:
+    """Búsqueda rápida (flat) ``ytsearchN:<consulta>``."""
+    n = _acotar_n(n)
+    opciones = _opciones_busqueda()
     resultados: list[dict] = []
     with yt_dlp.YoutubeDL(opciones) as ydl:
         info = ydl.extract_info(f"ytsearch{n}:{consulta}", download=False)
     for entrada in (info or {}).get("entries", []) or []:
-        if entrada:
+        # Aunque se piden vídeos, YouTube cuela a veces el canal del artista:
+        # como «vídeo» saldría una tarjeta que ni se escucha ni se descarga.
+        if entrada and _tipo_de_entrada(entrada) == "video":
             resultados.append(_entrada_a_resultado(entrada))
     return resultados
 
