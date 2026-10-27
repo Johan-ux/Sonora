@@ -6,8 +6,11 @@ La forma más sencilla en Windows es ejecutar el atajo:
 scripts\iniciar.bat
 ```
 
-`iniciar.bat` activa el entorno virtual (`.venv`) y lanza la app. De forma
-equivalente, desde la raíz del repositorio:
+`iniciar.bat` lanza la app con el Python del entorno virtual (`.venv`). La
+primera vez lo prepara solo: si no hay `.venv`, o el que hay no funciona (uno
+copiado de otro equipo nunca funciona: guarda la ruta absoluta del Python con
+el que se creó), lo crea con el Python del sistema e instala las dependencias.
+De forma equivalente, desde la raíz del repositorio:
 
 ```bash
 python -m sonora
