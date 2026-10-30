@@ -14,6 +14,8 @@ el [versionado semántico](https://semver.org/lang/es/).
 - `scripts/iniciar.sh` (y `iniciar.command` para abrir con doble clic en
   macOS) prepara Sonora en Linux y macOS como `iniciar.bat` en Windows: crea
   el entorno, instala las dependencias y ofrece instalar ffmpeg si falta.
+- Los dos atajos de arranque pasan sus argumentos a la app:
+  `scripts\iniciar.bat --navegador` o `scripts/iniciar.sh --navegador`.
 - Los avisos de la barra lateral dicen cómo instalar ffmpeg y Deno en el
   sistema en el que estás, no siempre con `winget`.
 

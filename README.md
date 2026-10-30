@@ -6,14 +6,14 @@
 
 <p align="center">
   Busca música en YouTube, descárgala en MP3 de alta calidad y escúchala desde tu propia biblioteca.<br>
-  Una app de escritorio para Windows que se abre sin instalar nada.
+  Una app de escritorio: en Windows se abre sin instalar nada, y desde el código funciona también en Linux y macOS.
 </p>
 
 <p align="center">
   <a href="https://github.com/Johan-ux/Sonora/releases/latest"><img alt="Última versión" src="https://img.shields.io/github/v/release/Johan-ux/Sonora?label=versi%C3%B3n"></a>
   <a href="https://github.com/Johan-ux/Sonora/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Johan-ux/Sonora/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="Licencia MIT" src="https://img.shields.io/github/license/Johan-ux/Sonora?label=licencia"></a>
-  <img alt="Windows 10 y 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6">
+  <img alt="Windows, macOS y Linux" src="https://img.shields.io/badge/sistemas-Windows%20%7C%20macOS%20%7C%20Linux-0078D6">
   <img alt="Python 3.11 o posterior" src="https://img.shields.io/badge/python-3.11%2B-3776AB">
 </p>
 
@@ -31,7 +31,7 @@
 
 ---
 
-## Empezar
+## Empezar en Windows
 
 1. Descarga [`Sonora-windows-x64.zip`](https://github.com/Johan-ux/Sonora/releases/latest/download/Sonora-windows-x64.zip)
    de la última versión.
@@ -44,6 +44,9 @@ se actualiza desde la propia app. Funciona en Windows 10 y 11 de 64 bits.
 > Al ser un `.exe` sin firmar, la primera vez Windows puede decir «Windows
 > protegió su PC»: **Más información → Ejecutar de todas formas**. Si quieres
 > comprobar la descarga, cada versión publica la huella SHA-256 del zip.
+
+¿Linux o macOS? Sonora se usa desde el código, con un script que lo prepara
+todo: ver [Desde el código](#desde-el-código).
 
 ## Funciones
 
@@ -79,7 +82,7 @@ se actualiza desde la propia app. Funciona en Windows 10 y 11 de 64 bits.
 | Listo para abrir         | ✅ `Sonora.exe`        | —                                  | —                      |
 | Desde el código, con     | `scripts\iniciar.bat`  | `scripts/iniciar.command` (doble clic) | `scripts/iniciar.sh` |
 | Se ve en                 | Ventana propia         | Ventana propia (sin probar)        | El navegador           |
-| La CI comprueba          | Tests                  | Tests y arranque en el navegador   | Tests y arranque       |
+| La CI comprueba          | Tests                  | Tests y arranque en el navegador   | Tests y arranque en el navegador |
 
 - **Windows** es donde se desarrolla y se prueba todo, y el único sistema con
   ejecutable: PyInstaller solo construye el del sistema en el que se ejecuta, y
@@ -113,8 +116,8 @@ Paso a paso, y lo que cambia en cada sistema, en
 
 | Documento                            | Contenido                                                    |
 | ------------------------------------ | ------------------------------------------------------------ |
-| [Instalación](docs/instalacion.md)   | Requisitos, ffmpeg, dependencias y dónde viven tus datos     |
-| [Uso](docs/uso.md)                   | Recorrido por la interfaz y atajos de teclado                |
+| [Instalación](docs/instalacion.md)   | Requisitos, scripts de arranque, cada sistema y tus datos    |
+| [Uso](docs/uso.md)                   | Abrirla (ventana o navegador), la interfaz y los atajos      |
 | [CLI](docs/cli.md)                   | Descarga por lotes desde la terminal y cookies               |
 | [Empaquetado](docs/empaquetado.md)   | Construir y publicar el `.exe` que no necesita instalar nada |
 | [Arquitectura](docs/arquitectura.md) | Estructura del proyecto, decisiones de diseño y tests        |

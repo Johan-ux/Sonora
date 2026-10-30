@@ -1,7 +1,7 @@
 """Application factory de «Sonora».
 
 ``crear_app()`` construye y devuelve la aplicación Flask ya inicializada; el
-lanzamiento real de la ventana de escritorio (pywebview + puerto libre) lo hace
+arranque real (puerto libre y ventana de pywebview, o el navegador) lo hace
 ``escritorio.py``. ``preparar()`` inicializa la base de datos y es idempotente.
 """
 
@@ -64,8 +64,8 @@ def _origen_permitido(origen: str, host: str) -> bool:
     """Indica si ``origen`` (cabecera Origin) corresponde a la propia app.
 
     Se acepta el host exacto de la petición y sus equivalentes en loopback:
-    la ventana carga ``http://127.0.0.1:<puerto>``, pero un navegador abierto
-    a mano sobre ``localhost`` es igual de legítimo.
+    la interfaz carga ``http://127.0.0.1:<puerto>`` (en la ventana o en el
+    navegador), pero abrirla a mano sobre ``localhost`` es igual de legítimo.
     """
     try:
         partes = urlsplit(origen)

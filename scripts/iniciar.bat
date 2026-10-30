@@ -7,6 +7,8 @@ REM  La primera vez prepara el entorno solo: si no hay .venv, o el
 REM  que hay no funciona, lo crea con el Python del sistema e
 REM  instala las dependencias. Un .venv copiado de otro equipo no
 REM  funciona: guarda la ruta absoluta del Python con el que se creo.
+REM
+REM  Los argumentos pasan a la app:  scripts\iniciar.bat --navegador
 REM ============================================================
 setlocal
 REM Este script vive en scripts\; trabajamos desde la raiz del repositorio.
@@ -34,7 +36,7 @@ if errorlevel 1 (
     )
 )
 
-"%VENV_PY%" -m sonora
+"%VENV_PY%" -m sonora %*
 if errorlevel 1 (
     echo.
     echo La aplicacion termino con un error.

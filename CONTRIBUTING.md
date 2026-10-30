@@ -42,12 +42,13 @@ python -m pytest                          # tests
 python -m ruff check sonora tests scripts # linter
 ```
 
-La CI ejecuta lo mismo en Windows y Ubuntu, con Python 3.11 y 3.14, y además
-arranca Sonora en Ubuntu para comprobar que se abre en el navegador. Un _pull
-request_ se fusiona con la CI en verde.
+La CI ejecuta lo mismo en Windows y Ubuntu (Python 3.11 y 3.14) y en macOS
+(3.14), y además arranca Sonora con `scripts/iniciar.sh` en Ubuntu y macOS
+para comprobar que se abre en el navegador. Un _pull request_ se fusiona con
+la CI en verde.
 
-Si tocas el empaquetado, construye el `.exe` y ábrelo
-(ver [docs/empaquetado.md](docs/empaquetado.md)):
+Si tocas el empaquetado, construye el `.exe` (solo se puede en Windows) y
+ábrelo (ver [docs/empaquetado.md](docs/empaquetado.md)):
 
 ```bash
 python scripts/construir.py
@@ -65,15 +66,20 @@ python scripts/construir.py
 ## Commits
 
 Mensajes en español con el formato de
-[Conventional Commits](https://www.conventionalcommits.org/es/v1.0.0/):
+[Conventional Commits](https://www.conventionalcommits.org/es/v1.0.0/): un
+título corto y una lista breve de lo que se hizo.
 
 ```text
-fix: la cola no se vacía al cancelar la última descarga
+fix: conserva la cola al cancelar la última descarga
 
-Explicación en prosa de qué fallaba y por qué el cambio lo arregla.
+- Deja los pendientes en la cola al cancelar la descarga en curso
+- Añade un test de regresión
 ```
 
-Tipos habituales: `feat`, `fix`, `docs`, `refactor`, `test`, `ci` y `chore`.
+- **Título**: `tipo: qué se hizo`, con el verbo en presente, en minúscula, sin
+  punto final y en unos 70 caracteres como mucho.
+- **Cuerpo**: de 2 a 5 viñetas de una línea, sin punto final.
+- **Tipos**: `feat`, `fix`, `docs`, `refactor`, `test`, `ci` y `chore`.
 
 ## Pull requests
 

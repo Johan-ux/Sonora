@@ -39,16 +39,25 @@ body:
       label: Cómo la usas
       options:
         - El .exe de Releases
-        - Desde el código (python -m sonora)
+        - Desde el código (iniciar.bat, iniciar.sh o python -m sonora)
         - La CLI (python -m sonora.cli)
     validations:
       required: true
+
+  - type: dropdown
+    id: vista
+    attributes:
+      label: Dónde se ve
+      options:
+        - En su ventana
+        - En el navegador
+        - No aplica (la CLI)
 
   - type: input
     id: sistema
     attributes:
       label: Sistema operativo
-      placeholder: Windows 11 24H2
+      placeholder: Windows 11 24H2, macOS 15, Ubuntu 24.04…
 
   - type: textarea
     id: error

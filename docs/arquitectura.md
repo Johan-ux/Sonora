@@ -9,7 +9,7 @@ HTTP (`api/`) → lógica de negocio (`servicios/`) → persistencia (`db.py`).
 ```text
 sonora/                    Paquete principal (app de escritorio + CLI)
 ├── __main__.py            Punto de entrada: python -m sonora (y del .exe)
-├── escritorio.py          Servidor Flask en hilo daemon + ventana pywebview
+├── escritorio.py          Servidor Flask en hilo daemon + ventana pywebview o navegador
 ├── cli.py                 CLI de descarga por lotes (python -m sonora.cli)
 ├── factory.py             crear_app() + preparar() y el guard de Host y Origin
 ├── paths.py               Rutas de datos/recursos y validación anti path-traversal
@@ -42,6 +42,7 @@ datos/                     Datos locales en desarrollo (ignorada por git)
 ├── descargas/             Música y vídeos descargados
 ├── temporal/              Trabajo de las descargas en curso (una carpeta por ítem)
 ├── sonora.lock            Cerrojo de instancia única
+├── sonora.instancia       Proceso y dirección de la instancia abierta
 ├── yt-dlp/                Solo en el .exe: el yt-dlp descargado por la app
 └── biblioteca.db          SQLite: cola, historial y preferencias
 
@@ -52,7 +53,7 @@ scripts/                   iniciar.bat (Windows) e iniciar.sh + iniciar.command 
                            notas_version.py (notas de la release) y generar_icono.py
 tests/                     Suite de pytest
 .github/
-├── workflows/ci.yml       CI: lint y tests (Ubuntu y Windows) y arranque en Linux
+├── workflows/ci.yml       CI: lint y tests (Ubuntu, Windows, macOS) y arranque con iniciar.sh
 ├── workflows/publicar.yml Construye el zip para Windows y crea la release
 ├── ISSUE_TEMPLATE/        Formularios para fallos y propuestas
 ├── PULL_REQUEST_TEMPLATE.md
@@ -90,8 +91,8 @@ requirements-dev.txt       Dependencias de desarrollo (pytest y ruff)
   `resolver_dentro_descargas()`, que garantiza que no escapa de la carpeta de
   descargas (anti path-traversal). Está cubierto por tests.
 - **El servidor solo escucha en `127.0.0.1`** y en un puerto libre elegido en
-  cada arranque; el hilo del servidor es *daemon*, así que muere al cerrar la
-  ventana. Escuchar en loopback no lo aísla del navegador, así que cada
+  cada arranque; el hilo del servidor es *daemon*, así que muere con la app (al
+  cerrar la ventana o la última pestaña). Escuchar en loopback no lo aísla del navegador, así que cada
   petición pasa dos comprobaciones: la cabecera `Host` tiene que nombrar a
   esta máquina (contra el *DNS rebinding*) y, si cambia estado, su `Origin`
   tiene que ser la propia app.
@@ -110,6 +111,15 @@ requirements-dev.txt       Dependencias de desarrollo (pytest y ruff)
   de `/api/eventos` (una por pestaña) y se cierra cuando lleva 30 segundos sin
   ninguna. `webbrowser.open()` va en otro hilo porque puede no volver hasta
   que se cierre el navegador.
+- **Lo que depende del sistema está acotado**: la carpeta de datos
+  (`paths.py`), la ventana y el cerrojo de instancia (`escritorio.py`), abrir
+  una carpeta en el explorador (`api/biblioteca.py`) y cómo instalar lo que
+  falta (`salud.ordenes_instalar()`, que enseñan los avisos de la interfaz). El
+  resto es igual en Windows, Linux y macOS. Para arrancar desde el código hay
+  un atajo por sistema, `scripts/iniciar.bat` y `scripts/iniciar.sh`, que
+  preparan el entorno; el de Linux y macOS usa `.venv-unix` si encuentra en la
+  misma carpeta un `.venv` de Windows (desde WSL, por ejemplo), para no
+  romperlo.
 - **Lo que está a medias no pisa la carpeta de música.** yt-dlp baja y
   convierte en `temporal/<id del ítem>/` (opción `paths`) y solo al acabar
   mueve el resultado a `descargas/`. Sus intermedios llevan extensiones de
@@ -124,8 +134,8 @@ requirements-dev.txt       Dependencias de desarrollo (pytest y ruff)
   cola entera en cada cambio serían dos mil repintados de mil filas.
 - **Las preferencias de la interfaz se guardan en el backend**, no en el
   `localStorage` del navegador: la ventana usa un perfil privado y el puerto
-  cambia en cada arranque, así que lo que guarde la página no sobrevive al
-  cierre. El volumen, el tema de color y la posición, tamaño y modo de la
+  cambia en cada arranque (en el navegador, otro puerto es otro origen), así
+  que lo que guarde la página no sobrevive al cierre. El volumen, el tema de color y la posición, tamaño y modo de la
   ventana de vídeo pasan por `/api/config` como el resto de la configuración.
   El tema, además, va ya puesto en el HTML que sirve `/` (`<html data-tema>`)
   para que la ventana no abra con un color y salte a otro.
@@ -159,12 +169,16 @@ python -m pytest -q
 ```
 
 La suite cubre la validación anti path-traversal, la capa SQLite (incluido el
-reclamo atómico de ítems del worker), los helpers y el contrato de la API HTTP
-(sin tocar la red). Los tests no arrancan nunca el worker de descargas ni salen
-a internet, y usan una BD temporal por test.
+reclamo atómico de ítems del worker), el worker de descargas, el contrato de la
+API HTTP, el arranque (ventana o navegador, e instancia única) y la
+actualización de yt-dlp dentro del `.exe`. Los tests no salen a internet, no
+abren ventanas ni el navegador y usan una BD temporal por test.
 
-En GitHub, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) ejecuta el
-linter y los tests en Ubuntu y Windows, con Python 3.11 (la mínima) y 3.14 (la
-del `.exe`), en cada push a `main` y en cada pull request. Además arranca
-Sonora de verdad en Ubuntu, donde no hay motor de ventana para pywebview, y
-comprueba que pasa sola al navegador y que la interfaz responde.
+En GitHub, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) se ejecuta
+en cada push a `main` y en cada pull request:
+
+- **Linter y tests** en Ubuntu y Windows con Python 3.11 (la mínima) y 3.14 (la
+  del `.exe`), y en macOS con 3.14.
+- **Arranque** con `scripts/iniciar.sh` desde cero, como lo haría cualquiera:
+  en Ubuntu, donde no hay motor de ventana y Sonora tiene que pasar sola al
+  navegador, y en macOS con `--navegador`. Comprueba que la interfaz responde.

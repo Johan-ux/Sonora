@@ -7,18 +7,22 @@ postprocesadores) a través de `sonora/ydl_opts.py`, y por defecto guarda en la
 **misma carpeta de descargas** que la app, así que lo descargado aparece en tu
 biblioteca.
 
+Necesita el mismo entorno que la app desde el código (ver
+[instalación](instalacion.md)) y funciona igual en Windows, Linux y macOS. El
+`.exe` no la incluye.
+
 ## Uso
 
 1. Crea tu fichero de URLs a partir del ejemplo:
 
    ```bash
-   cp ejemplos/urls.example.txt urls.txt
+   cp ejemplos/urls.example.txt urls.txt     # Windows: copy ejemplos\urls.example.txt urls.txt
    ```
 
    Edita `urls.txt` con tus enlaces (separados por comas y/o saltos de línea).
    Las líneas que empiezan por `#` se ignoran. `urls.txt` está en `.gitignore`.
 
-2. Ejecuta la CLI desde la raíz del repositorio:
+2. Ejecuta la CLI desde la raíz del repositorio, con el entorno virtual activado:
 
    ```bash
    # Carpeta de salida por defecto: la de descargas de Sonora

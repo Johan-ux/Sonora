@@ -15,7 +15,8 @@ lo ven los administradores del repositorio.
 
 Cuenta, si puedes:
 
-- qué parte de Sonora está afectada (la app, el `.exe`, la CLI) y qué versión;
+- qué parte de Sonora está afectada (el `.exe`, la app desde el código o la
+  CLI), en qué sistema y qué versión;
 - cómo reproducirlo, paso a paso;
 - qué podría hacer quien lo aprovechara.
 
@@ -25,8 +26,8 @@ crédito para quien lo encontró, salvo que prefieras quedar en el anonimato.
 
 ## Qué cuenta como vulnerabilidad
 
-Sonora abre un servidor local (en `127.0.0.1`) que la ventana usa para todo, y
-descarga y ejecuta programas de terceros. Interesa especialmente:
+Sonora abre un servidor local (en `127.0.0.1`) que la interfaz usa para todo,
+en su ventana o en el navegador, y descarga y ejecuta programas de terceros. Interesa especialmente:
 
 - que una página web cualquiera, abierta en el navegador, pueda llamar a la API
   local de Sonora (falsificación de peticiones, *DNS rebinding*…);

@@ -31,7 +31,8 @@ Lo que hace:
 3. Solo en Linux y macOS: si falta ffmpeg, ofrece instalarlo con el gestor de
    paquetes (`brew`, `apt`, `dnf`, `pacman` o `zypper`) y recomienda Deno si no
    hay ningún runtime de JavaScript.
-4. Arranca Sonora. Los argumentos pasan a la app: `scripts/iniciar.sh --navegador`.
+4. Arranca Sonora. Los argumentos pasan a la app: `scripts/iniciar.sh --navegador`
+   (o `scripts\iniciar.bat --navegador`).
 
 > **Debian y Ubuntu** traen Python sin el módulo `venv`. Si falta, el script da
 > la orden exacta (`sudo apt install python3.X-venv`).
@@ -42,7 +43,8 @@ Lo que hace:
 ## Cada sistema
 
 - **Windows**: Sonora abre su propia ventana, con el WebView2 que trae el
-  sistema. Es donde se desarrolla y se prueba todo.
+  sistema (si faltara, se abre en el navegador). Es donde se desarrolla y se
+  prueba todo, y el único sistema con ejecutable.
 - **Linux**: se abre en el navegador predeterminado. pywebview no trae en Linux
   con qué dibujar la ventana, y Sonora lo detecta y usa el navegador sin que
   haya que hacer nada. Mejor así: los navegadores reproducen MP3 y MP4, y el
@@ -70,16 +72,25 @@ Si prefieres prepararlo todo a mano, sigue leyendo.
 winget install Gyan.FFmpeg
 # choco install ffmpeg
 
+# macOS (Homebrew)
+brew install ffmpeg
+
 # Debian / Ubuntu
 sudo apt install ffmpeg
 
-# macOS (Homebrew)
-brew install ffmpeg
+# Fedora (con RPM Fusion) · Arch · openSUSE
+sudo dnf install ffmpeg
+sudo pacman -S ffmpeg
+sudo zypper install ffmpeg
 ```
 
 > **Windows (winget):** tras instalar ffmpeg no hace falta ni reiniciar la
 > terminal: la app **autodetecta** ffmpeg (incluida la ubicación de winget) y
 > reintenta la detección sola si lo instalas con la app abierta.
+
+En Linux y macOS, `scripts/iniciar.sh` ofrece instalarlo con estas mismas
+órdenes, y si falta, el aviso de la app enseña la de tu sistema. Con el `.exe`
+no hace falta: va dentro.
 
 ## Runtime de JavaScript (recomendado)
 
@@ -108,13 +119,14 @@ La primera descarga baja además el script que resuelve el desafío
 (`ejs`, del repositorio de yt-dlp) y lo deja cacheado.
 
 > Si no hay ningún runtime, la app **sigue funcionando** por la vía
-> alternativa: no falla, solo pierde robustez.
+> alternativa: no falla, solo pierde robustez. El `.exe` trae Deno dentro.
 
 ## Mantener yt-dlp al día
 
 YouTube cambia con frecuencia y **una versión vieja de yt-dlp es la causa más
 habitual de que las descargas fallen** (típicamente con `HTTP Error 403:
-Forbidden`). Si algo deja de descargar, lo primero es actualizar:
+Forbidden`). Si algo deja de descargar, lo primero es actualizar, con el botón
+**Actualizar ahora** del aviso de la app o a mano:
 
 ```bash
 pip install --upgrade yt-dlp
@@ -147,17 +159,17 @@ python -m pytest              # tests
 python -m ruff check sonora tests scripts   # linter
 ```
 
-Ambos se ejecutan también en CI, sobre Ubuntu y Windows. Las reglas de ruff
+Ambos se ejecutan también en la CI, en Ubuntu, Windows y macOS. Las reglas de ruff
 están en [`pyproject.toml`](../pyproject.toml): se silencian a propósito las
 que chocan con decisiones tomadas a conciencia en este proyecto (los `except`
 amplios del worker, por ejemplo, que llevan su `# noqa` explicando el porqué).
 
 ## Dónde se guardan tus datos
 
-| Modo                | Carpeta de datos                                   |
-| ------------------- | -------------------------------------------------- |
-| Desarrollo          | `datos/` en la raíz del repositorio (fuera de git) |
-| Ejecutable (`.exe`) | `%LOCALAPPDATA%\Sonora` en Windows                 |
+| Cómo la usas                        | Carpeta de datos                                   |
+| ----------------------------------- | -------------------------------------------------- |
+| Desde el código (cualquier sistema) | `datos/` en la raíz del repositorio (fuera de git) |
+| Ejecutable (`.exe`, Windows)        | `%LOCALAPPDATA%\Sonora`                            |
 
 En ambos casos contiene `descargas/` (los MP3) y `biblioteca.db` (cola,
 historial y preferencias). Si vienes de una versión que guardaba los datos en

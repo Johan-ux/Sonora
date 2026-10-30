@@ -4,6 +4,11 @@ El objetivo es que cualquiera use Sonora **sin instalar nada**: ni Python, ni
 ffmpeg, ni un runtime de JavaScript. Se reparte una carpeta con `Sonora.exe` y
 todo lo que necesita, comprimida en un zip.
 
+> Solo hay ejecutable para Windows: PyInstaller construye el del sistema en el
+> que se ejecuta, y este lleva dentro ffmpeg y Deno de Windows. En Linux y
+> macOS, Sonora se usa desde el código con `scripts/iniciar.sh` (ver
+> [instalación](instalacion.md#la-forma-rápida)).
+
 ## Construir
 
 ```bash
@@ -98,7 +103,8 @@ se borra solo.
 ## Requisitos del equipo
 
 Windows 10 u 11 de 64 bits. La ventana usa **WebView2**, que viene con Windows
-11 y con las versiones al día de Windows 10.
+11 y con las versiones al día de Windows 10. Si faltara, Sonora se abre en el
+navegador en lugar de fallar.
 
 El `.exe` no está firmado, así que la primera vez Windows puede enseñar
 «Windows protegió su PC»: **Más información → Ejecutar de todas formas**.

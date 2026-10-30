@@ -1,43 +1,45 @@
-# Uso (desarrollo)
+# Uso
 
-La forma más sencilla es el atajo de tu sistema:
+## Abrir Sonora
 
-```bash
-scripts\iniciar.bat           # Windows
-scripts/iniciar.sh            # Linux y macOS (en macOS, también doble clic en iniciar.command)
-```
+| Cómo la tienes                    | Cómo se abre                                                                    |
+| --------------------------------- | ------------------------------------------------------------------------------- |
+| El zip de *Releases* (Windows)    | Doble clic en `Sonora\Sonora.exe`                                               |
+| Desde el código, en Windows       | `scripts\iniciar.bat`                                                           |
+| Desde el código, en Linux o macOS | `scripts/iniciar.sh` (en macOS, también doble clic en `scripts/iniciar.command`) |
 
-El atajo lanza la app con el Python del entorno virtual (`.venv`). La primera
-vez lo prepara solo: si no hay `.venv`, o el que hay no funciona (uno copiado
-de otro equipo nunca funciona: guarda la ruta absoluta del Python con el que se
-creó), lo crea con el Python del sistema e instala las dependencias. En Linux y
-macOS, además, ofrece instalar ffmpeg si falta (ver
-[instalación](instalacion.md#la-forma-rápida)). De forma equivalente, desde la
-raíz del repositorio:
+Los atajos preparan el entorno la primera vez —crean el `.venv` o lo rehacen si
+no funciona, instalan las dependencias y, en Linux y macOS, ofrecen instalar
+ffmpeg si falta (ver [instalación](instalacion.md#la-forma-rápida))— y después
+arrancan la app. Con el entorno ya preparado, desde la raíz del repositorio
+también vale:
 
 ```bash
 python -m sonora
 ```
 
-En ambos casos se abre la **ventana propia** de Sonora (no el navegador). Por
-dentro, la app arranca un pequeño servidor Flask en `127.0.0.1` sobre un puerto
-libre y abre esa ventana con `pywebview`. Al cerrar la ventana, la app termina
-por completo.
+Por dentro, la app arranca un pequeño servidor Flask en `127.0.0.1` sobre un
+puerto libre y enseña la interfaz de una de estas dos formas; la interfaz es la
+misma en las dos.
+
+### En su ventana
+
+Lo normal en Windows y, en principio, en macOS: Sonora abre su **ventana
+propia** con `pywebview`. Al cerrarla, la app termina por completo.
 
 ### En el navegador
 
-Si la ventana no puede abrirse (en Linux, o en un Windows sin WebView2), Sonora
-abre la misma interfaz en el navegador predeterminado y deja la dirección en
-la terminal. También se puede pedir:
+Si la ventana no puede abrirse (siempre en Linux, y en un Windows sin
+WebView2), Sonora abre la interfaz en el navegador predeterminado y deja la
+dirección en la terminal. También se puede pedir en cualquier sistema:
 
 ```bash
-python -m sonora --navegador
+python -m sonora --navegador      # o con el atajo: scripts/iniciar.sh --navegador
 ```
 
 Sin ventana no hay nada que cerrar, así que la app se cierra sola unos
-segundos después de cerrar su pestaña; una recarga no la cierra. Abrir Sonora
-otra vez con la pestaña cerrada abre una nueva en la instancia que ya está en
-marcha.
+segundos después de cerrar su pestaña (o con `Ctrl+C` en la terminal); una
+recarga no la cierra.
 
 ## De un vistazo
 
@@ -184,7 +186,8 @@ Además de la ventana flotante hay otros dos modos, en los botones de la barra:
 - **Modo teatro**: el vídeo ocupa toda la zona de contenido. También con doble
   clic en la barra de título.
 - **Pantalla completa**: también con doble clic sobre el vídeo. Al salir, la
-  ventana de la app queda como estaba (maximizada, si lo estaba). En la vista
+  ventana de la app queda como estaba (maximizada, si lo estaba); en el
+  navegador, la pantalla completa es la del propio navegador. En la vista
   previa vale igual el botón de pantalla completa del reproductor de YouTube:
   pulsado con la de la app ya puesta, sale de ella.
 
@@ -196,11 +199,11 @@ El botón de la flecha **oculta** el vídeo sin detenerlo, para seguir solo con
 el sonido; el icono de la cámara en la barra de reproducción lo vuelve a
 mostrar.
 
-## Una sola ventana
+## Una sola Sonora a la vez
 
 Sonora no se abre dos veces sobre los mismos datos: si ya está abierta, un
-segundo arranque trae al frente la ventana que hay y termina. Dos copias a la
-vez se pisarían la cola de descargas.
+segundo arranque trae al frente su ventana —o, si está en el navegador, le abre
+otra pestaña— y termina. Dos copias a la vez se pisarían la cola de descargas.
 
 ## Descargas en paralelo
 
@@ -245,7 +248,11 @@ un aviso abajo en la barra lateral:
   puede actualizar con descargas en marcha.
 - **Tu yt-dlp pasa de 90 días** y no se pudo consultar si hay uno más nuevo
   (sin conexión, por ejemplo).
-- **Falta un runtime de JavaScript**, con la orden para instalarlo.
+- **Falta un runtime de JavaScript**, con la orden para instalarlo en tu
+  sistema.
+
+Si falta ffmpeg, un aviso aparte lo dice, también con la orden de tu sistema
+(`winget`, `brew`, `apt`…).
 
 Si no hay nada que decir, el aviso no se muestra. La comprobación consulta
 PyPI con un tiempo de espera corto y cachea el resultado seis horas, así que no
