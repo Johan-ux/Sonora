@@ -11,11 +11,18 @@ el [versionado semántico](https://semver.org/lang/es/).
 - Sonora se abre en el navegador cuando no puede abrir su ventana: así
   funciona también en Linux. Se puede pedir con `python -m sonora --navegador`.
   Sin ventana, se cierra sola al cerrar su pestaña.
+- `scripts/iniciar.sh` (y `iniciar.command` para abrir con doble clic en
+  macOS) prepara Sonora en Linux y macOS como `iniciar.bat` en Windows: crea
+  el entorno, instala las dependencias y ofrece instalar ffmpeg si falta.
+- Los avisos de la barra lateral dicen cómo instalar ffmpeg y Deno en el
+  sistema en el que estás, no siempre con `winget`.
 
 ### Corregido
 
 - Abrir Sonora estando ya abierta podía traer al frente otra ventana que se
   llamara igual, como el Explorador en la carpeta del zip, en vez de la suya.
+- `iniciar.bat` aceptaba Python 3.9 y 3.10, con los que las dependencias no
+  llegan a instalarse: ahora pide 3.11 o posterior.
 
 ## [1.0.0] - 2026-10-30
 

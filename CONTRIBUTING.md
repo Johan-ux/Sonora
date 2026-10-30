@@ -19,7 +19,10 @@ habitual (YouTube cambia a menudo).
 ## Preparar el entorno
 
 Hace falta **Python 3.11 o posterior** y **ffmpeg** (ver
-[docs/instalacion.md](docs/instalacion.md)).
+[docs/instalacion.md](docs/instalacion.md)). Lo más rápido es el atajo de tu
+sistema, que prepara el entorno y arranca la app: `scripts\iniciar.bat` en
+Windows y `scripts/iniciar.sh` en Linux y macOS. Para hacerlo a mano, con
+las herramientas de desarrollo:
 
 ```bash
 python -m venv .venv

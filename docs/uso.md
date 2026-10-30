@@ -1,16 +1,19 @@
 # Uso (desarrollo)
 
-La forma más sencilla en Windows es ejecutar el atajo:
+La forma más sencilla es el atajo de tu sistema:
 
 ```bash
-scripts\iniciar.bat
+scripts\iniciar.bat           # Windows
+scripts/iniciar.sh            # Linux y macOS (en macOS, también doble clic en iniciar.command)
 ```
 
-`iniciar.bat` lanza la app con el Python del entorno virtual (`.venv`). La
-primera vez lo prepara solo: si no hay `.venv`, o el que hay no funciona (uno
-copiado de otro equipo nunca funciona: guarda la ruta absoluta del Python con
-el que se creó), lo crea con el Python del sistema e instala las dependencias.
-De forma equivalente, desde la raíz del repositorio:
+El atajo lanza la app con el Python del entorno virtual (`.venv`). La primera
+vez lo prepara solo: si no hay `.venv`, o el que hay no funciona (uno copiado
+de otro equipo nunca funciona: guarda la ruta absoluta del Python con el que se
+creó), lo crea con el Python del sistema e instala las dependencias. En Linux y
+macOS, además, ofrece instalar ffmpeg si falta (ver
+[instalación](instalacion.md#la-forma-rápida)). De forma equivalente, desde la
+raíz del repositorio:
 
 ```bash
 python -m sonora

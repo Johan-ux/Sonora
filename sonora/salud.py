@@ -13,6 +13,7 @@ usa solo la biblioteca estándar.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import sys
 import threading
@@ -175,6 +176,45 @@ def ultima_version_pypi(forzar: bool = False) -> str:
     return version
 
 
+def sistema() -> str:
+    """``'windows'``, ``'macos'`` o ``'linux'`` (cualquier otro Unix cuenta como Linux)."""
+    if sys.platform == "win32":
+        return "windows"
+    if sys.platform == "darwin":
+        return "macos"
+    return "linux"
+
+
+# En Linux, la orden de instalar de cada gestor de paquetes, por preferencia.
+GESTORES_LINUX = (
+    ("apt", "sudo apt install"),
+    ("dnf", "sudo dnf install"),
+    ("pacman", "sudo pacman -S"),
+    ("zypper", "sudo zypper install"),
+)
+
+
+def ordenes_instalar() -> dict[str, str]:
+    """Cómo instalar ffmpeg y Deno en este sistema, para los avisos de la interfaz.
+
+    Las mismas que propone ``scripts/iniciar.sh`` (o ``winget`` en Windows).
+    """
+    actual = sistema()
+    if actual == "windows":
+        return {"ffmpeg": "winget install Gyan.FFmpeg", "deno": "winget install DenoLand.Deno"}
+    if actual == "macos":
+        return {"ffmpeg": "brew install ffmpeg", "deno": "brew install deno"}
+    instalar = next(
+        (orden for gestor, orden in GESTORES_LINUX if shutil.which(gestor)),
+        GESTORES_LINUX[0][1],
+    )
+    return {
+        "ffmpeg": f"{instalar} ffmpeg",
+        # Ninguna distribución grande lo empaqueta: va con su instalador.
+        "deno": "curl -fsSL https://deno.land/install.sh | sh",
+    }
+
+
 def estado(consultar_red: bool = True) -> dict:
     """Fotografía del entorno para que la interfaz avise de lo que falta.
 
@@ -200,6 +240,7 @@ def estado(consultar_red: bool = True) -> dict:
                        "soportados": list(RUNTIMES_JS)},
         "empaquetada": empaquetada(),
         "reinicio_pendiente": reinicio_pendiente(),
+        "instalar": ordenes_instalar(),
     }
 
 

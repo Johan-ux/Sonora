@@ -8,6 +8,8 @@ __pycache__/
 
 # Entornos virtuales
 .venv/
+# El que crea scripts/iniciar.sh cuando .venv es de Windows (WSL, carpeta compartida)
+.venv-unix/
 venv/
 env/
 

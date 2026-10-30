@@ -74,42 +74,40 @@ se actualiza desde la propia app. Funciona en Windows 10 y 11 de 64 bits.
 
 ## Sistemas
 
-|                                     | Windows 10 y 11 | macOS                  | Linux          |
-| ----------------------------------- | :-------------: | :--------------------: | :------------: |
-| Ejecutable listo para abrir         | ✅              | —                      | —              |
-| Desde el código                     | ✅ Ventana propia | 🧪 Ventana propia, sin probar | ✅ En el navegador |
-| Se comprueba en cada cambio (CI)    | ✅              | —                      | ✅             |
+|                          | Windows 10 y 11        | macOS                              | Linux                  |
+| ------------------------ | ---------------------- | ---------------------------------- | ---------------------- |
+| Listo para abrir         | ✅ `Sonora.exe`        | —                                  | —                      |
+| Desde el código, con     | `scripts\iniciar.bat`  | `scripts/iniciar.command` (doble clic) | `scripts/iniciar.sh` |
+| Se ve en                 | Ventana propia         | Ventana propia (sin probar)        | El navegador           |
+| La CI comprueba          | Tests                  | Tests y arranque en el navegador   | Tests y arranque       |
 
 - **Windows** es donde se desarrolla y se prueba todo, y el único sistema con
   ejecutable: PyInstaller solo construye el del sistema en el que se ejecuta, y
   el de Sonora lleva dentro ffmpeg y Deno para Windows.
 - **Linux**: Sonora se abre en el navegador, porque pywebview no trae allí con
-  qué dibujar su ventana. Es la misma interfaz, y la CI comprueba en cada cambio
-  que arranca en Ubuntu.
-- **macOS**: el código está preparado y pywebview usa el WebKit del sistema,
-  pero nadie lo ha probado todavía. Si la ventana no se abriera, Sonora pasaría
+  qué dibujar su ventana. Es la misma interfaz.
+- **macOS**: pywebview abre la ventana con el WebKit del sistema, pero nadie la
+  ha probado todavía (la CI no tiene pantalla). Si no se abriera, Sonora pasaría
   sola al navegador. Si lo pruebas, cuéntalo en un
   [issue](https://github.com/Johan-ux/Sonora/issues/new/choose).
 
-En cualquier sistema, `python -m sonora --navegador` abre la interfaz en el
-navegador en vez de en la ventana. Sin ventana, Sonora se cierra sola al cerrar
-su pestaña.
+En cualquier sistema, `--navegador` abre la interfaz en el navegador en vez de
+en la ventana. Sin ventana, Sonora se cierra sola al cerrar su pestaña.
 
 ## Desde el código
 
-Necesitas **Python 3.11 o posterior** y **ffmpeg** instalado en el sistema.
+Basta con tener **Python 3.11 o posterior**. El script de tu sistema prepara el
+resto la primera vez: crea el entorno virtual, instala las dependencias y, en
+Linux y macOS, si falta ffmpeg, ofrece instalarlo.
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate        # Linux/macOS: source .venv/bin/activate
-pip install -r requirements.txt
-
-python -m sonora              # en Windows también: scripts\iniciar.bat
+scripts\iniciar.bat           # Windows
+scripts/iniciar.sh            # Linux y macOS (en macOS, también doble clic en iniciar.command)
 ```
 
-Los detalles de cada sistema, en [instalación](docs/instalacion.md). Para
-construir el `.exe` tú mismo: `scripts\construir_exe.bat` (ver
-[empaquetado](docs/empaquetado.md)).
+Paso a paso, y lo que cambia en cada sistema, en
+[instalación](docs/instalacion.md). Para construir el `.exe` tú mismo:
+`scripts\construir_exe.bat` (ver [empaquetado](docs/empaquetado.md)).
 
 ## Documentación
 

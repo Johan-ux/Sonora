@@ -159,6 +159,63 @@ class TestEstado:
         monkeypatch.setattr(salud, "empaquetada", lambda: True)
         assert salud.estado(consultar_red=False)["empaquetada"] is True
 
+    def test_dice_como_instalar_lo_que_falta(self):
+        instalar = salud.estado(consultar_red=False)["instalar"]
+        assert instalar == salud.ordenes_instalar()
+
+
+class TestOrdenesInstalar:
+    """Los avisos de la interfaz dicen cómo instalar ffmpeg y Deno en ESTE sistema."""
+
+    @pytest.mark.parametrize(
+        ("plataforma", "esperado"),
+        [("win32", "windows"), ("darwin", "macos"), ("linux", "linux"), ("freebsd14", "linux")],
+    )
+    def test_reconoce_el_sistema(self, monkeypatch, plataforma, esperado):
+        monkeypatch.setattr(salud.sys, "platform", plataforma)
+        assert salud.sistema() == esperado
+
+    def test_windows_usa_winget(self, monkeypatch):
+        monkeypatch.setattr(salud, "sistema", lambda: "windows")
+        assert salud.ordenes_instalar() == {
+            "ffmpeg": "winget install Gyan.FFmpeg",
+            "deno": "winget install DenoLand.Deno",
+        }
+
+    def test_macos_usa_homebrew(self, monkeypatch):
+        monkeypatch.setattr(salud, "sistema", lambda: "macos")
+        assert salud.ordenes_instalar() == {
+            "ffmpeg": "brew install ffmpeg",
+            "deno": "brew install deno",
+        }
+
+    @pytest.mark.parametrize(
+        ("gestor", "orden"),
+        [
+            ("apt", "sudo apt install ffmpeg"),
+            ("dnf", "sudo dnf install ffmpeg"),
+            ("pacman", "sudo pacman -S ffmpeg"),
+            ("zypper", "sudo zypper install ffmpeg"),
+        ],
+    )
+    def test_linux_usa_su_gestor_de_paquetes(self, monkeypatch, gestor, orden):
+        monkeypatch.setattr(salud, "sistema", lambda: "linux")
+        monkeypatch.setattr(
+            salud.shutil, "which", lambda nombre: f"/usr/bin/{nombre}" if nombre == gestor else None
+        )
+        ordenes = salud.ordenes_instalar()
+        assert ordenes["ffmpeg"] == orden
+        assert "deno.land/install.sh" in ordenes["deno"]
+
+    def test_linux_sin_gestor_conocido_propone_apt(self, monkeypatch):
+        monkeypatch.setattr(salud, "sistema", lambda: "linux")
+        monkeypatch.setattr(salud.shutil, "which", lambda nombre: None)
+        assert salud.ordenes_instalar()["ffmpeg"] == "sudo apt install ffmpeg"
+
+    def test_la_pagina_trae_la_orden_de_este_sistema(self, client, monkeypatch):
+        monkeypatch.setattr(salud, "sistema", lambda: "macos")
+        assert "<code>brew install ffmpeg</code>" in client.get("/").get_data(as_text=True)
+
 
 class TestActualizarEmpaquetada:
     """Dentro del .exe no hay pip: se descarga el wheel (sonora.actualizacion)."""

@@ -44,17 +44,17 @@ endlocal
 exit /b 0
 
 :crear_venv
-REM Busca un Python 3.9+ del sistema: primero el lanzador "py" (lo instalan
+REM Busca un Python 3.11+ del sistema: primero el lanzador "py" (lo instalan
 REM tanto python.org como el gestor de instalacion de Python) y luego
 REM "python". El "python" que trae Windows cuando no hay ninguno instalado
 REM es un atajo a la Microsoft Store que no ejecuta codigo: no pasa la prueba.
 set "PY="
-py -3 -c "import sys; sys.exit(sys.version_info < (3, 9))" >nul 2>&1 && set "PY=py -3"
+py -3 -c "import sys; sys.exit(sys.version_info < (3, 11))" >nul 2>&1 && set "PY=py -3"
 if not defined PY (
-    python -c "import sys; sys.exit(sys.version_info < (3, 9))" >nul 2>&1 && set "PY=python"
+    python -c "import sys; sys.exit(sys.version_info < (3, 11))" >nul 2>&1 && set "PY=python"
 )
 if not defined PY (
-    echo ERROR: no se encontro Python 3.9 o superior.
+    echo ERROR: no se encontro Python 3.11 o superior.
     echo Instalalo desde https://www.python.org/downloads/ y vuelve a ejecutar este script.
     exit /b 1
 )

@@ -24,6 +24,10 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         # La mínima que admiten yt-dlp y pythonnet, y la que lleva el .exe.
         python: ["3.11", "3.14"]
+        # macOS, con una basta: sus minutos cuentan diez veces en un repo privado.
+        include:
+          - os: macos-latest
+            python: "3.14"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -48,9 +52,22 @@ jobs:
       - name: Tests
         run: python -m pytest
 
-  arranque-linux:
-    name: Arranque en Linux (en el navegador)
-    runs-on: ubuntu-latest
+  arranque:
+    name: Arranque con iniciar.sh (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Sin motor de ventana para pywebview: Sonora tiene que darse cuenta
+          # sola y pasar al navegador.
+          - os: ubuntu-latest
+            argumentos: ""
+            sin_ventana: true
+          # La ventana usaría el WebKit del sistema; aquí se prueba el navegador.
+          - os: macos-latest
+            argumentos: "--navegador"
+            sin_ventana: false
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 
@@ -60,26 +77,25 @@ jobs:
           cache: pip
           cache-dependency-path: requirements*.txt
 
-      - name: Instalar dependencias
-        run: python -m pip install -r requirements.txt
-
-      # Con lo que instala requirements.txt, pywebview no tiene en Linux con qué
-      # dibujar la ventana: Sonora tiene que darse cuenta sola y abrirse en el
-      # navegador. BROWSER=true hace de navegador que no abre nada.
-      - name: Arrancar Sonora y abrir la interfaz
+      # Desde cero, como lo haría alguien: el script crea el entorno, instala y
+      # arranca. BROWSER=true hace de navegador que no abre nada.
+      - name: Arrancar Sonora con scripts/iniciar.sh
         env:
           BROWSER: "true"
         run: |
-          python -m sonora > sonora.log 2>&1 &
+          scripts/iniciar.sh ${{ matrix.argumentos }} > sonora.log 2>&1 &
           sonora=$!
-          for _ in $(seq 1 60); do
-            url=$(grep -o 'en el navegador: http://127.0.0.1:[0-9]*' sonora.log | grep -o 'http.*')
+          url=""
+          for _ in $(seq 1 300); do
+            url=$(grep -o 'en el navegador: http://127.0.0.1:[0-9]*' sonora.log | grep -o 'http.*' || true)
             [ -n "$url" ] && break
             sleep 1
           done
           cat sonora.log
-          grep -q "No se pudo abrir la ventana de Sonora" sonora.log
           test -n "$url"
+          if [ "${{ matrix.sin_ventana }}" = "true" ]; then
+            grep -q "No se pudo abrir la ventana de Sonora" sonora.log
+          fi
           curl -fsS "$url/" | grep -q "<title>Sonora</title>"
           curl -fsS "$url/api/salud?red=0"
           kill "$sonora"

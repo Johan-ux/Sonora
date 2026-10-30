@@ -2821,10 +2821,12 @@ function mensajeSalud(datos) {
     };
   }
   if (!runtime.disponible) {
+    // La orden depende del sistema (winget, brew, el instalador de Deno…).
+    const orden = (datos.instalar || {}).deno;
     return {
       nivel: "aviso",
       html: "Sin runtime de JavaScript, YouTube puede negar algunos formatos." +
-        " Instala uno con <code>winget install DenoLand.Deno</code>.",
+        (orden ? " Instala uno con <code>" + esc(orden) + "</code>." : ""),
       accion: false,
     };
   }

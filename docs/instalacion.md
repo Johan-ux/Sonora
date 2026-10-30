@@ -12,6 +12,33 @@
 - **ffmpeg** instalado (dependencia de **sistema**, no se instala con pip).
 - **Un runtime de JavaScript** (opcional pero recomendado): ver más abajo.
 
+## La forma rápida
+
+Con Python instalado, el script de tu sistema hace todo lo demás la primera vez
+y después arranca la app:
+
+| Sistema | Script                                              |
+| ------- | --------------------------------------------------- |
+| Windows | `scripts\iniciar.bat` (doble clic o desde la terminal) |
+| macOS   | `scripts/iniciar.command` (doble clic) o `scripts/iniciar.sh` |
+| Linux   | `scripts/iniciar.sh`                                |
+
+Lo que hace:
+
+1. Busca un Python 3.11 o posterior; si no lo hay, dice cómo instalarlo.
+2. Crea el entorno virtual `.venv` (o lo rehace si el que hay no funciona, como
+   uno copiado de otro equipo) e instala las dependencias.
+3. Solo en Linux y macOS: si falta ffmpeg, ofrece instalarlo con el gestor de
+   paquetes (`brew`, `apt`, `dnf`, `pacman` o `zypper`) y recomienda Deno si no
+   hay ningún runtime de JavaScript.
+4. Arranca Sonora. Los argumentos pasan a la app: `scripts/iniciar.sh --navegador`.
+
+> **Debian y Ubuntu** traen Python sin el módulo `venv`. Si falta, el script da
+> la orden exacta (`sudo apt install python3.X-venv`).
+>
+> Si la carpeta tiene un `.venv` de **Windows** (por ejemplo, abierta desde
+> WSL), `iniciar.sh` no lo toca y usa `.venv-unix`.
+
 ## Cada sistema
 
 - **Windows**: Sonora abre su propia ventana, con el WebView2 que trae el
@@ -20,11 +47,11 @@
   con qué dibujar la ventana, y Sonora lo detecta y usa el navegador sin que
   haya que hacer nada. Mejor así: los navegadores reproducen MP3 y MP4, y el
   motor Qt que se instala con pip no trae esos códecs. La CI comprueba en cada
-  cambio que arranca en Ubuntu.
+  cambio que `iniciar.sh` la deja funcionando en Ubuntu.
 - **macOS**: `pip install -r requirements.txt` instala lo que pywebview
-  necesita para abrir la ventana con el WebKit del sistema. Nadie lo ha
-  probado todavía; si la ventana no se abriera, Sonora pasaría sola al
-  navegador.
+  necesita para abrir la ventana con el WebKit del sistema. La CI pasa los
+  tests en macOS y comprueba que arranca en el navegador, pero la ventana no la
+  ha probado nadie todavía; si no se abriera, Sonora pasaría sola al navegador.
 
 Sin ventana, Sonora deja la dirección en la terminal y se cierra sola unos
 segundos después de cerrar su pestaña (o con `Ctrl+C`). Para usar el navegador
@@ -34,7 +61,7 @@ en cualquier sistema:
 python -m sonora --navegador
 ```
 
-`scripts\iniciar.bat` es solo para Windows; en el resto, `python -m sonora`.
+Si prefieres prepararlo todo a mano, sigue leyendo.
 
 ## Instalar ffmpeg
 
