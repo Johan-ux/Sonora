@@ -39,7 +39,7 @@ Este código de conducta aplica tanto a espacios del proyecto como a espacios p�
 
 ## Aplicación
 
-Instancias de comportamiento abusivo, acosador o inaceptable de otro modo podrán ser reportadas a los administradores de la comunidad responsables del cumplimiento con la opción **Report content** de GitHub (menú «…» del *issue*, comentario o *pull request* en cuestión), que llega en privado a los administradores del repositorio. Todas las quejas serán evaluadas e investigadas de una manera puntual y justa.
+Instancias de comportamiento abusivo, acosador o inaceptable de otro modo podrán ser reportadas con la opción **Report content** de GitHub (menú «…» del *issue*, comentario o *pull request* en cuestión). El aviso llega en privado al equipo de GitHub, que puede actuar sobre la cuenta implicada; los administradores de la comunidad, por su parte, pueden ocultar comentarios, bloquear a usuarios y limitar las interacciones en el repositorio. Todas las quejas serán evaluadas e investigadas de una manera puntual y justa.
 
 Todos los administradores de la comunidad están obligados a respetar la privacidad y la seguridad de quienes reporten incidentes.
 
