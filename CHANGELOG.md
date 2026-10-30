@@ -6,6 +6,12 @@ el [versionado semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Corregido
+
+- La huella `Sonora-windows-x64.zip.sha256` se puede comprobar con
+  `sha256sum -c`: llevaba saltos de línea de Windows y la orden no
+  encontraba el zip.
+
 ## [1.1.0] - 2026-10-30
 
 Sonora funciona también en Linux y macOS, desde el código.

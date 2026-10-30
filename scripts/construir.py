@@ -226,6 +226,17 @@ def escribir_licencias(destino: Path) -> None:
     )
 
 
+def escribir_huella(archivo: Path) -> Path:
+    """Deja junto a ``archivo`` su huella en el formato de ``sha256sum``.
+
+    Con salto de línea ``\\n`` también en Windows: con ``\\r\\n``,
+    ``sha256sum -c`` lee el ``\\r`` como parte del nombre y no encuentra el zip.
+    """
+    huella = archivo.with_name(archivo.name + ".sha256")
+    huella.write_text(f"{_huella(archivo)}  {archivo.name}\n", encoding="utf-8", newline="\n")
+    return huella
+
+
 def main() -> int:
     preparar_herramientas()
     subprocess.run(
@@ -239,9 +250,7 @@ def main() -> int:
     archivo = Path(
         shutil.make_archive(str(DIST / NOMBRE_ZIP), "zip", root_dir=DIST, base_dir="Sonora")
     )
-    # Mismo formato que sha256sum, para que se pueda comprobar con él.
-    huella = archivo.with_name(archivo.name + ".sha256")
-    huella.write_text(f"{_huella(archivo)}  {archivo.name}\n", encoding="utf-8")
+    huella = escribir_huella(archivo)
     print(f"\nListo (Sonora {version_sonora()}):")
     for ruta in (carpeta / "Sonora.exe", archivo, huella):
         print(f"  {ruta}")
