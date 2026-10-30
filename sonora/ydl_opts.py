@@ -11,6 +11,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from . import paths
+
 # Plantilla del nombre de salida. Incluye el id del vídeo para que dos vídeos
 # distintos con el mismo título no se sobrescriban entre sí (p. ej. dos
 # canciones tituladas "Intro" de canales diferentes).
@@ -53,8 +55,26 @@ def normalizar_resolucion(valor) -> str:
 RUNTIMES_JS = ("deno", "node", "bun", "quickjs")
 
 
+def runtime_js_incluido() -> Path | None:
+    """El deno que viaja con el ejecutable empaquetado, o ``None``.
+
+    En desarrollo no hay ninguno: se usa el del sistema.
+    """
+    for nombre in ("deno.exe", "deno"):
+        ruta = paths.DIR_HERRAMIENTAS / nombre
+        if ruta.is_file():
+            return ruta
+    return None
+
+
 def detectar_runtime_js() -> str | None:
-    """Primer runtime de JavaScript soportado que haya en el PATH, o ``None``."""
+    """Runtime de JavaScript a usar, o ``None`` si no hay ninguno.
+
+    Primero el incluido en el ejecutable; si no, el primero soportado que haya
+    en el PATH.
+    """
+    if runtime_js_incluido() is not None:
+        return "deno"
     for nombre in RUNTIMES_JS:
         if shutil.which(nombre):
             return nombre
@@ -74,13 +94,16 @@ def opciones_runtime_js() -> dict:
     deja cacheado. Si no hay ningún runtime instalado devuelve ``{}`` y la app
     sigue funcionando por la vía alternativa, sin fallar.
     """
+    incluido = runtime_js_incluido()
     runtime = detectar_runtime_js()
     if runtime is None:
         return {}
+    # El incluido no está en el PATH: yt-dlp necesita su ruta.
+    config = {"path": str(incluido)} if incluido is not None else {}
     return {
         # La API de Python espera {runtime: {config}}; la lista plana es solo
         # la forma que acepta la línea de órdenes de yt-dlp.
-        "js_runtimes": {runtime: {}},
+        "js_runtimes": {runtime: config},
         "remote_components": ["ejs:github"],
     }
 

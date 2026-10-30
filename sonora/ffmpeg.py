@@ -13,14 +13,18 @@ import threading
 import time
 from pathlib import Path
 
+from . import paths
+
 
 def localizar_ffmpeg(ruta_explicita: Path | None = None) -> Path | None:
     """Localiza el ejecutable de ffmpeg de forma robusta.
 
     Orden de búsqueda:
         1. Ruta indicada explícitamente.
-        2. El PATH del sistema (``shutil.which``).
-        3. Ubicaciones habituales en Windows, incluida la de winget. Esto permite
+        2. El que viaja con el ejecutable empaquetado (``paths.DIR_HERRAMIENTAS``):
+           una versión conocida, y así nadie tiene que instalar ffmpeg.
+        3. El PATH del sistema (``shutil.which``).
+        4. Ubicaciones habituales en Windows, incluida la de winget. Esto permite
            que funcione aunque la terminal se abriera antes de instalar ffmpeg y
            todavía no haya recargado el PATH.
 
@@ -35,6 +39,8 @@ def localizar_ffmpeg(ruta_explicita: Path | None = None) -> Path | None:
 
     if ruta_explicita is not None:
         candidatos.append(ruta_explicita)
+
+    candidatos.append(paths.DIR_HERRAMIENTAS)
 
     en_path = shutil.which("ffmpeg")
     if en_path:

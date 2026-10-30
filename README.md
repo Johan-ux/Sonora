@@ -11,14 +11,25 @@ temas de color a elegir), con tres piezas en una sola ventana:
 - 🎧 **Reproductor + biblioteca** con aleatorio, repetición y control por
   teclas multimedia.
 
-Construida con **Python + Flask + pywebview** y empaquetable a un `.exe` con
+Construida con **Python + Flask + pywebview** y empaquetada a un `.exe` con
 **PyInstaller**.
 
 > ⚠️ Proyecto de uso **personal y privado**. No es comercial.
 
 ---
 
-## 🚀 Empezar
+## ⬇️ Descargar y usar (Windows, sin instalar nada)
+
+1. Descarga `Sonora-windows-x64.zip` de la página de **Releases**.
+2. Descomprímelo (clic derecho → *Extraer todo*).
+3. Abre `Sonora\Sonora.exe`.
+
+Lleva dentro todo lo que necesita (ffmpeg y el runtime de JavaScript), y
+yt-dlp se actualiza desde la propia app. Al ser un `.exe` sin firmar, la
+primera vez Windows puede decir «Windows protegió su PC»: **Más información →
+Ejecutar de todas formas**.
+
+## 🚀 Desde el código
 
 ```bash
 # 1) Dependencias (requiere ffmpeg instalado en el sistema)
@@ -41,7 +52,7 @@ Guía detallada en [docs/instalacion.md](docs/instalacion.md).
 | [Instalación](docs/instalacion.md)   | Requisitos, ffmpeg, dependencias y dónde viven tus datos |
 | [Uso](docs/uso.md)                   | Arranque, recorrido por la interfaz y atajos de teclado  |
 | [CLI](docs/cli.md)                   | Descarga por lotes desde la terminal y cookies           |
-| [Empaquetado](docs/empaquetado.md)   | Generar `Sonora.exe` con PyInstaller                     |
+| [Empaquetado](docs/empaquetado.md)   | Construir y publicar el `.exe` que no necesita instalar nada |
 | [Arquitectura](docs/arquitectura.md) | Estructura del proyecto, decisiones de diseño, tests     |
 
 ---
@@ -85,7 +96,8 @@ sonora/       Paquete principal: app de escritorio (__main__, escritorio) y CLI 
 datos/        Tus datos en desarrollo: descargas/ + biblioteca.db (fuera de git)
 docs/         Documentación
 ejemplos/     Ficheros de ejemplo (urls.example.txt para la CLI)
-scripts/      iniciar.bat, construir_exe.bat, sonora.spec (PyInstaller) y generar_icono.py
+scripts/      iniciar.bat, construir.py + construir_exe.bat, sonora.spec (PyInstaller)
+              y generar_icono.py
 tests/        Suite de pytest
 ```
 

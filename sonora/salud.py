@@ -84,8 +84,8 @@ def recordar_pypi(momento: float, version: str) -> None:
 def empaquetada() -> bool:
     """Indica si corremos dentro del ejecutable de PyInstaller.
 
-    Importa porque ahí yt-dlp va **congelado** dentro del binario: pip no puede
-    actualizarlo y la única salida es reconstruir el ejecutable.
+    Importa porque ahí yt-dlp va **congelado** dentro del binario y no hay pip:
+    la versión nueva se descarga aparte (ver ``sonora.actualizacion``).
     """
     return bool(getattr(sys, "frozen", False))
 
@@ -194,8 +194,6 @@ def estado(consultar_red: bool = True) -> dict:
             "dias": antiguedad,
             # Vieja de más aunque PyPI no conteste: mismo criterio que yt-dlp.
             "caducada": antiguedad >= DIAS_PARA_CADUCAR,
-            # Congelado dentro del .exe: pip no puede tocarlo.
-            "actualizable": not empaquetada(),
         },
         "ffmpeg": {"disponible": ffmpeg.localizacion() is not None},
         "runtime_js": {"nombre": runtime or "", "disponible": runtime is not None,
@@ -206,10 +204,12 @@ def estado(consultar_red: bool = True) -> dict:
 
 
 def actualizar_yt_dlp() -> dict:
-    """Actualiza yt-dlp con pip. Devuelve ``{ok, mensaje, version}``.
+    """Actualiza yt-dlp. Devuelve ``{ok, mensaje, version}``.
 
-    Se invoca a pip como módulo del intérprete actual (``sys.executable -m
-    pip``) y sin shell: los argumentos son fijos, nada procede del usuario.
+    En desarrollo, con pip, invocado como módulo del intérprete actual
+    (``sys.executable -m pip``) y sin shell: los argumentos son fijos, nada
+    procede del usuario. Empaquetada no hay pip: se descarga el wheel de PyPI
+    (ver ``sonora.actualizacion``).
 
     Nota: el yt-dlp ya importado sigue en memoria, así que la versión nueva no
     entra en vigor hasta reiniciar la app; el mensaje lo deja claro y, desde
@@ -217,13 +217,18 @@ def actualizar_yt_dlp() -> dict:
     """
     global _reinicio_pendiente
     if empaquetada():
+        # Import tardío: 'actualizacion' depende de este módulo.
+        from . import actualizacion
+
+        try:
+            nueva = actualizacion.descargar()
+        except actualizacion.ErrorActualizacion as error:
+            return {"ok": False, "mensaje": str(error), "version": version_instalada()}
+        _reinicio_pendiente = True
         return {
-            "ok": False,
-            "mensaje": (
-                "La app empaquetada lleva yt-dlp dentro del ejecutable: no se "
-                "puede actualizar desde aquí, hay que reconstruirla."
-            ),
-            "version": version_instalada(),
+            "ok": True,
+            "mensaje": "yt-dlp actualizado. Reinicia Sonora para usar la versión nueva.",
+            "version": nueva,
         }
     try:
         proceso = subprocess.run(

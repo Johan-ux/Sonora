@@ -155,25 +155,49 @@ class TestEstado:
         assert "disponible" in estado["ffmpeg"]
         assert "disponible" in estado["runtime_js"]
 
-    def test_empaquetada_marca_no_actualizable(self, monkeypatch):
-        # Dentro del .exe, yt-dlp va congelado: pip no puede actualizarlo.
+    def test_dice_si_va_empaquetada(self, monkeypatch):
         monkeypatch.setattr(salud, "empaquetada", lambda: True)
-        estado = salud.estado(consultar_red=False)
-        assert estado["yt_dlp"]["actualizable"] is False
-        assert estado["empaquetada"] is True
+        assert salud.estado(consultar_red=False)["empaquetada"] is True
 
 
-class TestActualizar:
-    def test_empaquetada_no_ejecuta_pip(self, monkeypatch):
+class TestActualizarEmpaquetada:
+    """Dentro del .exe no hay pip: se descarga el wheel (sonora.actualizacion)."""
+
+    @pytest.fixture(autouse=True)
+    def _sin_pip(self, monkeypatch):
         monkeypatch.setattr(salud, "empaquetada", lambda: True)
 
         def no_debe_llamarse(*args, **kwargs):
             raise AssertionError("no se debe invocar a pip en la app empaquetada")
 
         monkeypatch.setattr(salud.subprocess, "run", no_debe_llamarse)
+
+    def test_descarga_el_wheel_y_pide_reiniciar(self, monkeypatch):
+        from sonora import actualizacion
+
+        monkeypatch.setattr(actualizacion, "descargar", lambda: "2026.09.02")
+        resultado = salud.actualizar_yt_dlp()
+        assert resultado == {
+            "ok": True,
+            "mensaje": "yt-dlp actualizado. Reinicia Sonora para usar la versión nueva.",
+            "version": "2026.09.02",
+        }
+        assert salud.reinicio_pendiente() is True
+
+    def test_un_fallo_se_reporta_y_no_pide_reiniciar(self, monkeypatch):
+        from sonora import actualizacion
+
+        def falla():
+            raise actualizacion.ErrorActualizacion("No se pudo consultar PyPI: sin red")
+
+        monkeypatch.setattr(actualizacion, "descargar", falla)
         resultado = salud.actualizar_yt_dlp()
         assert resultado["ok"] is False
-        assert "reconstruir" in resultado["mensaje"]
+        assert resultado["mensaje"] == "No se pudo consultar PyPI: sin red"
+        assert salud.reinicio_pendiente() is False
+
+
+class TestActualizar:
 
     def test_exito_pide_reiniciar(self, monkeypatch):
         monkeypatch.setattr(salud, "empaquetada", lambda: False)
@@ -232,7 +256,11 @@ class TestApiSalud:
         assert "yt_dlp" in datos and "ffmpeg" in datos and "runtime_js" in datos
 
     def test_post_fallido_responde_409_con_error(self, client, monkeypatch):
-        monkeypatch.setattr(salud, "empaquetada", lambda: True)
+        monkeypatch.setattr(salud, "empaquetada", lambda: False)
+        monkeypatch.setattr(
+            salud.subprocess, "run",
+            lambda *a, **k: subprocess.CompletedProcess(a, 1, "", "ERROR: sin red"),
+        )
         respuesta = client.post("/api/salud/actualizar")
         assert respuesta.status_code == 409
         datos = respuesta.get_json()

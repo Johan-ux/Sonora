@@ -11,6 +11,9 @@ Funciona tanto en desarrollo como empaquetado con PyInstaller:
                       como ``Program Files``.
 * ``RUTA_RECURSOS``   Carpeta con ``templates/`` y ``static/``. En desarrollo es
                       el propio paquete; empaquetado, ``sys._MEIPASS``.
+* ``DIR_HERRAMIENTAS`` Programas que viajan con el ejecutable (ffmpeg, ffprobe
+                      y deno), para que funcione sin instalar nada. Solo existe
+                      empaquetado; en desarrollo se usan los del sistema.
 
 Este módulo no crea directorios al importarse: ``preparar_directorios()`` lo
 hace explícitamente desde ``factory.preparar()``, con un error claro si falla.
@@ -76,6 +79,8 @@ DIR_BASE = _calcular_dir_base()
 CARPETA_DESCARGAS = DIR_BASE / "descargas"
 DB_PATH = DIR_BASE / "biblioteca.db"
 RUTA_RECURSOS = _calcular_ruta_recursos()
+# La rellena scripts/construir.py (ver scripts/sonora.spec).
+DIR_HERRAMIENTAS = RUTA_RECURSOS / "bin"
 
 
 def _volcar_wal(db_antigua: Path) -> None:

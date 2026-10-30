@@ -1,7 +1,8 @@
 @echo off
 REM ============================================================
-REM  Construye el ejecutable de "Sonora" con PyInstaller.
+REM  Construye "Sonora" para repartir (ver scripts\construir.py).
 REM  Resultado en:  dist\Sonora\Sonora.exe
+REM                 dist\Sonora-windows-x64.zip
 REM ============================================================
 setlocal
 REM Este script vive en scripts\; PyInstaller escribe build\ y dist\ en el
@@ -29,7 +30,7 @@ if errorlevel 1 (
 
 echo.
 echo Construyendo "Sonora"...
-"%PYTHON%" -m PyInstaller "scripts\sonora.spec" --noconfirm
+"%PYTHON%" "scripts\construir.py"
 if errorlevel 1 (
     echo.
     echo ERROR: la construccion fallo.
@@ -38,6 +39,5 @@ if errorlevel 1 (
 )
 
 echo.
-echo Listo. El ejecutable esta en:  dist\Sonora\Sonora.exe
 pause
 endlocal

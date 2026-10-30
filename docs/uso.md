@@ -231,9 +231,10 @@ Si no hay nada que decir, el aviso no se muestra. La comprobación consulta
 PyPI con un tiempo de espera corto y cachea el resultado seis horas, así que no
 retrasa el arranque; sin conexión, la app abre igual y no avisa de nada.
 
-> En la app **empaquetada** (`.exe`), yt-dlp va dentro del ejecutable y pip no
-> puede actualizarlo: el aviso lo dice y hay que reconstruirla
-> (ver [empaquetado.md](empaquetado.md)).
+> En la app **empaquetada** (`.exe`) no hay pip: **Actualizar ahora** baja la
+> versión nueva de yt-dlp de PyPI (comprobando su huella) a
+> `%LOCALAPPDATA%\Sonora\yt-dlp\` y, al reiniciar, Sonora la usa en lugar de la
+> que trae dentro. Ver [empaquetado.md](empaquetado.md).
 
 ## Atajos de teclado
 

@@ -125,6 +125,28 @@ class TestOpcionesVideo:
 class TestRuntimeJS:
     """Autodetección del runtime de JavaScript que resuelve las firmas."""
 
+    @pytest.fixture(autouse=True)
+    def herramientas(self, tmp_path, monkeypatch):
+        """Carpeta de programas incluidos, vacía salvo que el test ponga algo."""
+        carpeta = tmp_path / "bin"
+        carpeta.mkdir()
+        monkeypatch.setattr(ydl_opts.paths, "DIR_HERRAMIENTAS", carpeta)
+        return carpeta
+
+    def test_el_deno_incluido_gana_al_del_sistema(self, monkeypatch, herramientas):
+        deno = herramientas / "deno.exe"
+        deno.write_bytes(b"")
+        monkeypatch.setattr(ydl_opts.shutil, "which", lambda nombre: f"/usr/bin/{nombre}")
+        assert detectar_runtime_js() == "deno"
+        # No está en el PATH: yt-dlp tiene que recibir su ruta.
+        assert opciones_runtime_js()["js_runtimes"] == {"deno": {"path": str(deno)}}
+
+    def test_el_incluido_basta_sin_nada_en_el_path(self, monkeypatch, herramientas):
+        (herramientas / "deno.exe").write_bytes(b"")
+        monkeypatch.setattr(ydl_opts.shutil, "which", lambda nombre: None)
+        assert detectar_runtime_js() == "deno"
+        assert opciones_runtime_js()["remote_components"] == ["ejs:github"]
+
     def test_detecta_el_primero_disponible(self, monkeypatch):
         # Solo 'node' instalado: aunque 'deno' se prefiera, se elige node.
         monkeypatch.setattr(

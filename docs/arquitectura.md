@@ -19,6 +19,7 @@ sonora/                    Paquete principal (app de escritorio + CLI)
 ├── db.py                  Persistencia en SQLite (cola, historial, configuración)
 ├── sse.py                 Difusión de eventos en tiempo real (Server-Sent Events)
 ├── salud.py               Chequeo del entorno (versión de yt-dlp, ffmpeg, runtime JS)
+├── actualizacion.py       yt-dlp actualizable dentro del .exe (wheel de PyPI)
 ├── servicios/             Lógica de negocio
 │   ├── youtube.py         Búsqueda y expansión de playlists/canales/mixes (yt-dlp)
 │   ├── descargas.py       Worker de descarga + cancelación + progreso
@@ -41,13 +42,16 @@ datos/                     Datos locales en desarrollo (ignorada por git)
 ├── descargas/             Música y vídeos descargados
 ├── temporal/              Trabajo de las descargas en curso (una carpeta por ítem)
 ├── sonora.lock            Cerrojo de instancia única
+├── yt-dlp/                Solo en el .exe: el yt-dlp descargado por la app
 └── biblioteca.db          SQLite: cola, historial y preferencias
 
 docs/                      Esta documentación
 ejemplos/urls.example.txt  Fichero de URLs de ejemplo para la CLI
-scripts/                   iniciar.bat, construir_exe.bat, sonora.spec y generar_icono.py
+scripts/                   iniciar.bat, construir.py (+ construir_exe.bat), sonora.spec
+                           y generar_icono.py
 tests/                     Suite de pytest (paths, db, utils, ydl_opts, API)
 .github/workflows/ci.yml   CI: tests en Ubuntu y Windows
+.github/workflows/publicar.yml  Construye el zip para Windows y lo publica en Releases
 pyproject.toml             Configuración de herramientas (pytest)
 requirements.txt           Dependencias de la app
 requirements-dev.txt       Dependencias de desarrollo (pytest)
@@ -60,6 +64,14 @@ requirements-dev.txt       Dependencias de desarrollo (pytest)
   raíz: se invocan con `python -m sonora` y `python -m sonora.cli`, y comparten
   sin duplicación la localización de ffmpeg (`ffmpeg.py`) y las opciones de
   yt-dlp (`ydl_opts.py`).
+- **El ejecutable no depende de nada instalado.** Lleva dentro ffmpeg, ffprobe
+  y deno (`_internal/bin/`, `paths.DIR_HERRAMIENTAS`), que `ffmpeg.py` y
+  `ydl_opts.py` prefieren a los del sistema. yt-dlp va congelado en el binario,
+  pero caduca en semanas: `actualizacion.py` baja de PyPI el *wheel* nuevo a
+  la carpeta de datos y, al arrancar y antes del primer `import yt_dlp`, lo
+  pone delante en `sys.path`. Un wheel es un zip de Python puro y Python
+  importa desde un zip sin descomprimirlo, así que no hace falta pip ni
+  reescribir el `.exe`.
 - **Los datos nunca se mezclan con el código.** `paths.py` centraliza el cálculo
   de la carpeta de datos: `datos/` en desarrollo, `%LOCALAPPDATA%\Sonora` en el
   ejecutable. Además migra automáticamente los datos de ubicaciones antiguas.

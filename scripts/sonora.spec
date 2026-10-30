@@ -2,8 +2,9 @@
 # Spec de PyInstaller para la app de escritorio "Sonora".
 # Empaqueta a una carpeta (one-folder) con el nombre 'Sonora'.
 # Punto de entrada: sonora/__main__.py (el mismo de 'python -m sonora').
-# Construir con:  python -m PyInstaller scripts/sonora.spec --noconfirm
-# (o, más cómodo, con scripts\construir_exe.bat)
+# Construir con:  python scripts/construir.py
+# (o, más cómodo, con scripts\construir_exe.bat), que antes descarga ffmpeg y
+# deno a build/herramientas/ y después comprime el resultado.
 #
 # Notas de empaquetado:
 # - El spec vive en scripts/, así que todas las rutas se calculan desde SPECPATH
@@ -11,14 +12,27 @@
 #   directorio desde el que se invoque a PyInstaller.
 # - 'datas' incluye las carpetas 'templates' y 'static' para que Flask las
 #   encuentre vía sys._MEIPASS (RUTA_RECURSOS en sonora/paths.py).
+# - 'binaries' lleva ffmpeg, ffprobe y deno a 'bin' (DIR_HERRAMIENTAS en
+#   sonora/paths.py): así el ejecutable funciona sin instalar nada.
 # - console=False porque es una app de ventana (pywebview); no queremos consola.
 
 import os
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 # Raíz del repositorio (carpeta padre de scripts/).
 RAIZ = os.path.abspath(os.path.join(SPECPATH, os.pardir))
+
+# Programas que acompañan al ejecutable. Sin ellos saldría un .exe que solo
+# funciona donde ya estén instalados: mejor no construirlo.
+HERRAMIENTAS = os.path.join(RAIZ, 'build', 'herramientas')
+PROGRAMAS = ('ffmpeg.exe', 'ffprobe.exe', 'deno.exe')
+faltan = [p for p in PROGRAMAS if not os.path.isfile(os.path.join(HERRAMIENTAS, p))]
+if faltan:
+    raise SystemExit(
+        f"Faltan {', '.join(faltan)} en {HERRAMIENTAS}: construye con "
+        "'python scripts/construir.py', que los descarga."
+    )
 
 # Recolectar submódulos de las dependencias dinámicas para evitar fallos por
 # imports que PyInstaller no detecta estáticamente.
@@ -43,6 +57,11 @@ datas = [
     (os.path.join(RAIZ, 'sonora', 'templates'), 'templates'),
     (os.path.join(RAIZ, 'sonora', 'static'), 'static'),
 ]
+# La versión de yt-dlp que va dentro, para saber si la descargada es más nueva
+# (sonora/actualizacion.py la lee de estos metadatos sin importar yt-dlp).
+datas += copy_metadata('yt-dlp')
+
+binaries = [(os.path.join(HERRAMIENTAS, p), 'bin') for p in PROGRAMAS]
 
 
 a = Analysis(
@@ -50,7 +69,7 @@ a = Analysis(
     # La raíz en pathex para que 'import sonora' se resuelva durante el análisis
     # aunque PyInstaller se ejecute desde otro directorio.
     pathex=[RAIZ],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hidden,
     hookspath=[],
@@ -71,7 +90,9 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    # Sin UPX aunque esté instalado: los antivirus desconfían de los binarios
+    # comprimidos con él, y este .exe se reparte para abrirlo sin más.
+    upx=False,
     console=False,            # app de ventana: sin consola
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -87,7 +108,6 @@ coll = COLLECT(
     a.binaries,
     a.datas,
     strip=False,
-    upx=True,
-    upx_exclude=[],
+    upx=False,
     name='Sonora',
 )

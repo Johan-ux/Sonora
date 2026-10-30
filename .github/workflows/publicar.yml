@@ -1,0 +1,41 @@
+name: Publicar
+
+# Construye Sonora para Windows (ver scripts/construir.py) y, si lo lanza una
+# etiqueta v…, lo sube a Releases. A mano (Run workflow) solo deja el zip como
+# artefacto de la ejecución.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt "pyinstaller>=6.16"
+
+      - name: Construir
+        run: python scripts/construir.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sonora-windows-x64
+          path: dist/Sonora-windows-x64.zip
+
+      - name: Publicar en Releases
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" dist/Sonora-windows-x64.zip --title "Sonora ${{ github.ref_name }}" --generate-notes

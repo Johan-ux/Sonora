@@ -1,5 +1,10 @@
 # Instalación
 
+> **¿Solo quieres usar Sonora en Windows?** No hace falta instalar nada:
+> descarga `Sonora-windows-x64.zip` de la página de *Releases* del repositorio,
+> descomprímelo y abre `Sonora\Sonora.exe`. Esta guía es para ejecutarla desde
+> el código fuente.
+
 ## Requisitos
 
 - **Python 3.9+** (probado con Python 3.14 en Windows 11).
@@ -56,8 +61,9 @@ Forbidden`). Si algo deja de descargar, lo primero es actualizar:
 pip install --upgrade yt-dlp
 ```
 
-> Si usas el `.exe` empaquetado, yt-dlp va **congelado dentro**: actualizarlo
-> exige reconstruirlo (ver [empaquetado.md](empaquetado.md)).
+> Si usas el `.exe` empaquetado no hace falta nada de esto: ffmpeg y el runtime
+> de JavaScript van dentro, y yt-dlp se actualiza desde la propia app (botón
+> **Actualizar ahora**). Ver [empaquetado.md](empaquetado.md).
 
 ## Dependencias de Python
 

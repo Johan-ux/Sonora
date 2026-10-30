@@ -2810,10 +2810,6 @@ function mensajeSalud(datos) {
   if (yt.hay_actualizacion) {
     const texto = "Hay una versión nueva de " + YTDLP + " (" + esc(yt.instalada) +
       " → " + esc(yt.ultima) + "). Actualiza para evitar fallos de descarga.";
-    // Empaquetada: yt-dlp va dentro del .exe y pip no puede tocarlo.
-    if (!yt.actualizable) {
-      return { nivel: "aviso", html: texto + " Al ir empaquetada, hay que reconstruir la app.", accion: false };
-    }
     return { nivel: "aviso", html: texto, accion: true };
   }
   if (yt.caducada) {
@@ -2821,7 +2817,7 @@ function mensajeSalud(datos) {
       nivel: "aviso",
       html: "Tu " + YTDLP + " tiene " + esc(String(yt.dias)) + " días. No se pudo comprobar" +
         " si hay una versión nueva; si las descargas fallan, actualiza.",
-      accion: Boolean(yt.actualizable),
+      accion: true,
     };
   }
   if (!runtime.disponible) {
