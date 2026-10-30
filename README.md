@@ -72,6 +72,29 @@ se actualiza desde la propia app. Funciona en Windows 10 y 11 de 64 bits.
 - 🖥️ **CLI incluida**: descarga por lotes desde la terminal con
   `python -m sonora.cli urls.txt`.
 
+## Sistemas
+
+|                                     | Windows 10 y 11 | macOS                  | Linux          |
+| ----------------------------------- | :-------------: | :--------------------: | :------------: |
+| Ejecutable listo para abrir         | ✅              | —                      | —              |
+| Desde el código                     | ✅ Ventana propia | 🧪 Ventana propia, sin probar | ✅ En el navegador |
+| Se comprueba en cada cambio (CI)    | ✅              | —                      | ✅             |
+
+- **Windows** es donde se desarrolla y se prueba todo, y el único sistema con
+  ejecutable: PyInstaller solo construye el del sistema en el que se ejecuta, y
+  el de Sonora lleva dentro ffmpeg y Deno para Windows.
+- **Linux**: Sonora se abre en el navegador, porque pywebview no trae allí con
+  qué dibujar su ventana. Es la misma interfaz, y la CI comprueba en cada cambio
+  que arranca en Ubuntu.
+- **macOS**: el código está preparado y pywebview usa el WebKit del sistema,
+  pero nadie lo ha probado todavía. Si la ventana no se abriera, Sonora pasaría
+  sola al navegador. Si lo pruebas, cuéntalo en un
+  [issue](https://github.com/Johan-ux/Sonora/issues/new/choose).
+
+En cualquier sistema, `python -m sonora --navegador` abre la interfaz en el
+navegador en vez de en la ventana. Sin ventana, Sonora se cierra sola al cerrar
+su pestaña.
+
 ## Desde el código
 
 Necesitas **Python 3.11 o posterior** y **ffmpeg** instalado en el sistema.
@@ -84,7 +107,8 @@ pip install -r requirements.txt
 python -m sonora              # en Windows también: scripts\iniciar.bat
 ```
 
-Para construir el `.exe` tú mismo: `scripts\construir_exe.bat` (ver
+Los detalles de cada sistema, en [instalación](docs/instalacion.md). Para
+construir el `.exe` tú mismo: `scripts\construir_exe.bat` (ver
 [empaquetado](docs/empaquetado.md)).
 
 ## Documentación

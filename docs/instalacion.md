@@ -12,6 +12,30 @@
 - **ffmpeg** instalado (dependencia de **sistema**, no se instala con pip).
 - **Un runtime de JavaScript** (opcional pero recomendado): ver más abajo.
 
+## Cada sistema
+
+- **Windows**: Sonora abre su propia ventana, con el WebView2 que trae el
+  sistema. Es donde se desarrolla y se prueba todo.
+- **Linux**: se abre en el navegador predeterminado. pywebview no trae en Linux
+  con qué dibujar la ventana, y Sonora lo detecta y usa el navegador sin que
+  haya que hacer nada. Mejor así: los navegadores reproducen MP3 y MP4, y el
+  motor Qt que se instala con pip no trae esos códecs. La CI comprueba en cada
+  cambio que arranca en Ubuntu.
+- **macOS**: `pip install -r requirements.txt` instala lo que pywebview
+  necesita para abrir la ventana con el WebKit del sistema. Nadie lo ha
+  probado todavía; si la ventana no se abriera, Sonora pasaría sola al
+  navegador.
+
+Sin ventana, Sonora deja la dirección en la terminal y se cierra sola unos
+segundos después de cerrar su pestaña (o con `Ctrl+C`). Para usar el navegador
+en cualquier sistema:
+
+```bash
+python -m sonora --navegador
+```
+
+`scripts\iniciar.bat` es solo para Windows; en el resto, `python -m sonora`.
+
 ## Instalar ffmpeg
 
 ```bash
@@ -43,7 +67,14 @@ la app detecta el primero disponible y lo usa sola:
 ```bash
 # Windows (winget)
 winget install DenoLand.Deno
-# o, si ya tienes Node.js, no hace falta instalar nada
+
+# macOS (Homebrew)
+brew install deno
+
+# Linux
+curl -fsSL https://deno.land/install.sh | sh
+
+# o, si ya tienes Node.js 22 o posterior, no hace falta instalar nada
 ```
 
 La primera descarga baja además el script que resuelve el desafío

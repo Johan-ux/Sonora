@@ -39,7 +39,8 @@ python -m pytest                          # tests
 python -m ruff check sonora tests scripts # linter
 ```
 
-La CI ejecuta lo mismo en Windows y Ubuntu, con Python 3.11 y 3.14; un _pull
+La CI ejecuta lo mismo en Windows y Ubuntu, con Python 3.11 y 3.14, y además
+arranca Sonora en Ubuntu para comprobar que se abre en el navegador. Un _pull
 request_ se fusiona con la CI en verde.
 
 Si tocas el empaquetado, construye el `.exe` y ábrelo

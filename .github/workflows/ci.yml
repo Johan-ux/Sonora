@@ -47,3 +47,39 @@ jobs:
 
       - name: Tests
         run: python -m pytest
+
+  arranque-linux:
+    name: Arranque en Linux (en el navegador)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Instalar dependencias
+        run: python -m pip install -r requirements.txt
+
+      # Con lo que instala requirements.txt, pywebview no tiene en Linux con qué
+      # dibujar la ventana: Sonora tiene que darse cuenta sola y abrirse en el
+      # navegador. BROWSER=true hace de navegador que no abre nada.
+      - name: Arrancar Sonora y abrir la interfaz
+        env:
+          BROWSER: "true"
+        run: |
+          python -m sonora > sonora.log 2>&1 &
+          sonora=$!
+          for _ in $(seq 1 60); do
+            url=$(grep -o 'en el navegador: http://127.0.0.1:[0-9]*' sonora.log | grep -o 'http.*')
+            [ -n "$url" ] && break
+            sleep 1
+          done
+          cat sonora.log
+          grep -q "No se pudo abrir la ventana de Sonora" sonora.log
+          test -n "$url"
+          curl -fsS "$url/" | grep -q "<title>Sonora</title>"
+          curl -fsS "$url/api/salud?red=0"
+          kill "$sonora"

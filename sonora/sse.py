@@ -30,6 +30,12 @@ def eliminar_cliente(cliente: queue.Queue[str]) -> None:
         _CLIENTES.discard(cliente)
 
 
+def numero_clientes() -> int:
+    """Cuántos clientes SSE hay conectados: cada pestaña abierta tiene uno."""
+    with _LOCK:
+        return len(_CLIENTES)
+
+
 def emitir(evento: dict) -> None:
     """Difunde un evento (dict serializable) a todos los clientes SSE.
 

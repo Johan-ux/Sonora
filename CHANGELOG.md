@@ -6,6 +6,17 @@ el [versionado semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+### Añadido
+
+- Sonora se abre en el navegador cuando no puede abrir su ventana: así
+  funciona también en Linux. Se puede pedir con `python -m sonora --navegador`.
+  Sin ventana, se cierra sola al cerrar su pestaña.
+
+### Corregido
+
+- Abrir Sonora estando ya abierta podía traer al frente otra ventana que se
+  llamara igual, como el Explorador en la carpeta del zip, en vez de la suya.
+
 ## [1.0.0] - 2026-10-30
 
 Primera versión publicada.

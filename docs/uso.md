@@ -21,6 +21,21 @@ dentro, la app arranca un pequeño servidor Flask en `127.0.0.1` sobre un puerto
 libre y abre esa ventana con `pywebview`. Al cerrar la ventana, la app termina
 por completo.
 
+### En el navegador
+
+Si la ventana no puede abrirse (en Linux, o en un Windows sin WebView2), Sonora
+abre la misma interfaz en el navegador predeterminado y deja la dirección en
+la terminal. También se puede pedir:
+
+```bash
+python -m sonora --navegador
+```
+
+Sin ventana no hay nada que cerrar, así que la app se cierra sola unos
+segundos después de cerrar su pestaña; una recarga no la cierra. Abrir Sonora
+otra vez con la pestaña cerrada abre una nueva en la instancia que ya está en
+marcha.
+
 ## De un vistazo
 
 ![La biblioteca de Sonora con cuatro pistas y una sonando a medias en la barra de reproducción](img/biblioteca.png)

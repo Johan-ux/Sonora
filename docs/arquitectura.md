@@ -51,7 +51,7 @@ scripts/                   iniciar.bat, construir.py (+ construir_exe.bat), sono
                            notas_version.py (notas de la release) y generar_icono.py
 tests/                     Suite de pytest
 .github/
-├── workflows/ci.yml       CI: lint y tests en Ubuntu y Windows, Python 3.11 y 3.14
+├── workflows/ci.yml       CI: lint y tests (Ubuntu y Windows) y arranque en Linux
 ├── workflows/publicar.yml Construye el zip para Windows y crea la release
 ├── ISSUE_TEMPLATE/        Formularios para fallos y propuestas
 ├── PULL_REQUEST_TEMPLATE.md
@@ -97,7 +97,18 @@ requirements-dev.txt       Dependencias de desarrollo (pytest y ruff)
 - **Una sola instancia por carpeta de datos.** Al arrancar, `escritorio.py`
   toma un cerrojo del sistema operativo sobre `sonora.lock`; si ya lo tiene
   otro proceso, trae su ventana al frente y sale sin tocar la base de datos.
-  El cerrojo se suelta solo cuando el proceso muere, también si muere mal.
+  El cerrojo se suelta solo cuando el proceso muere, también si muere mal. La
+  ventana se busca por el proceso que anota `sonora.instancia` (con su
+  dirección), no solo por el título: «Sonora» se llama también el Explorador
+  abierto en la carpeta del zip. Si esa instancia no tiene ventana, se le abre
+  otra pestaña.
+- **Sin ventana, el navegador.** Si pywebview no puede abrir la ventana (en
+  Linux no trae motor; en un Windows sin WebView2 tampoco hay), `escritorio.py`
+  abre la misma interfaz en el navegador predeterminado; también con
+  `--navegador`. Como no hay ventana que cerrar, la app cuenta las conexiones
+  de `/api/eventos` (una por pestaña) y se cierra cuando lleva 30 segundos sin
+  ninguna. `webbrowser.open()` va en otro hilo porque puede no volver hasta
+  que se cierre el navegador.
 - **Lo que está a medias no pisa la carpeta de música.** yt-dlp baja y
   convierte en `temporal/<id del ítem>/` (opción `paths`) y solo al acabar
   mueve el resultado a `descargas/`. Sus intermedios llevan extensiones de
@@ -153,4 +164,6 @@ a internet, y usan una BD temporal por test.
 
 En GitHub, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) ejecuta el
 linter y los tests en Ubuntu y Windows, con Python 3.11 (la mínima) y 3.14 (la
-del `.exe`), en cada push a `main` y en cada pull request.
+del `.exe`), en cada push a `main` y en cada pull request. Además arranca
+Sonora de verdad en Ubuntu, donde no hay motor de ventana para pywebview, y
+comprueba que pasa sola al navegador y que la interfaz responde.
