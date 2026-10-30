@@ -27,4 +27,4 @@ Para obtener la aplicación, importa ``crear_app`` de ``sonora.factory``.
 # La versión de la app, en un solo sitio. La etiqueta de cada release es «v» +
 # esto (lo comprueba .github/workflows/publicar.yml) y va en las propiedades
 # del .exe (scripts/sonora.spec) y en la vista de Configuración.
-__version__ = "1.0.0"
+__version__ = "1.1.0"

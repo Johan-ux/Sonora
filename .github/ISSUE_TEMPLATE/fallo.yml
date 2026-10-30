@@ -29,7 +29,7 @@ body:
     attributes:
       label: Versión de Sonora
       description: Está en Configuración → Acerca de.
-      placeholder: "1.0.0"
+      placeholder: "1.1.0"
     validations:
       required: true
 

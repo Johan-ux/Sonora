@@ -6,6 +6,10 @@ el [versionado semántico](https://semver.org/lang/es/).
 
 ## [Sin publicar]
 
+## [1.1.0] - 2026-10-30
+
+Sonora funciona también en Linux y macOS, desde el código.
+
 ### Añadido
 
 - Sonora se abre en el navegador cuando no puede abrir su ventana: así
@@ -50,5 +54,6 @@ Primera versión publicada.
   runtime de JavaScript dentro, y yt-dlp se actualiza desde la propia app.
 - CLI para descargar por lotes desde la terminal.
 
-[Sin publicar]: https://github.com/Johan-ux/Sonora/compare/v1.0.0...HEAD
+[Sin publicar]: https://github.com/Johan-ux/Sonora/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Johan-ux/Sonora/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Johan-ux/Sonora/releases/tag/v1.0.0
