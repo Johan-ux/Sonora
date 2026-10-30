@@ -1,0 +1,24 @@
+# Dependabot abre un pull request cuando sale una versión nueva; la CI dice si
+# se puede fusionar. Una vez al mes, para no llenar la lista de PRs.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+    # Solo cuando la versión nueva se sale del rango de requirements*.txt: las
+    # cotas están puestas a propósito (ver los comentarios de esos ficheros).
+    versioning-strategy: increase-if-necessary
+    commit-message:
+      prefix: chore
+      include: scope

@@ -1,0 +1,58 @@
+name: Informar de un fallo
+description: Algo no funciona como debería.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por avisar. Si una descarga falla, mira antes si el aviso de la barra lateral ofrece actualizar yt-dlp: un yt-dlp viejo es la causa más habitual, porque YouTube cambia a menudo.
+
+  - type: textarea
+    id: que-pasa
+    attributes:
+      label: Qué pasa
+      description: Qué hiciste, qué esperabas que pasara y qué pasó en su lugar.
+    validations:
+      required: true
+
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: |
+        1. Busca «…»
+        2. Pulsa «Descargar» en el primer resultado
+        3. …
+
+  - type: input
+    id: version
+    attributes:
+      label: Versión de Sonora
+      description: Está en Configuración → Acerca de.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: forma
+    attributes:
+      label: Cómo la usas
+      options:
+        - El .exe de Releases
+        - Desde el código (python -m sonora)
+        - La CLI (python -m sonora.cli)
+    validations:
+      required: true
+
+  - type: input
+    id: sistema
+    attributes:
+      label: Sistema operativo
+      placeholder: Windows 11 24H2
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Mensaje de error
+      description: El texto del error tal cual, de la cola de descargas o de la terminal. No pegues cookies ni datos personales.
+      render: text

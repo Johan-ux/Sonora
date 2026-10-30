@@ -2,32 +2,48 @@ name: CI
 
 on:
   push:
+    branches: [master]
   pull_request:
+  workflow_dispatch:
+
+# Solo lectura: la CI no publica nada.
+permissions:
+  contents: read
+
+# Un push nuevo a la misma rama deja sin sentido la ejecución anterior.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        # La mínima que admiten yt-dlp y pythonnet, y la que lleva el .exe.
+        python: ["3.11", "3.14"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
 
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip install -r requirements-dev.txt
 
       - name: Compilar (comprobación de sintaxis)
-        run: python -m compileall sonora
+        run: python -m compileall -q sonora scripts
 
       - name: Lint (ruff)
-        run: python -m ruff check sonora tests
+        run: python -m ruff check sonora tests scripts
 
       - name: Tests
         run: python -m pytest

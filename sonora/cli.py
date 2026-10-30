@@ -26,7 +26,7 @@ from __future__ import annotations
 import argparse
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 try:
@@ -143,7 +143,7 @@ def registrar_fallo(log_fallidos: Path, url: str, error: str) -> None:
         url: URL que ha fallado.
         error: Mensaje de error asociado.
     """
-    marca_tiempo = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    marca_tiempo = datetime.now(UTC).astimezone().isoformat(timespec="seconds")
     mensaje = " ".join(error.split())  # colapsa saltos de línea y espacios
     try:
         with log_fallidos.open("a", encoding="utf-8") as fichero:

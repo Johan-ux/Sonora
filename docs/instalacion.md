@@ -7,7 +7,8 @@
 
 ## Requisitos
 
-- **Python 3.9+** (probado con Python 3.14 en Windows 11).
+- **Python 3.11 o posterior**: es la mínima que admiten yt-dlp y pythonnet. La
+  CI prueba la 3.11 y la 3.14 (la que lleva el `.exe`).
 - **ffmpeg** instalado (dependencia de **sistema**, no se instala con pip).
 - **Un runtime de JavaScript** (opcional pero recomendado): ver más abajo.
 
@@ -85,7 +86,7 @@ Para ejecutar los tests y el linter hacen falta además `pytest` y `ruff`:
 pip install -r requirements-dev.txt
 
 python -m pytest              # tests
-python -m ruff check sonora tests   # linter
+python -m ruff check sonora tests scripts   # linter
 ```
 
 Ambos se ejecutan también en CI, sobre Ubuntu y Windows. Las reglas de ruff

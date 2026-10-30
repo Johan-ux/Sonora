@@ -7,6 +7,7 @@
 
 # Binarios: que git no intente normalizar nada dentro.
 *.png binary
+*.jpg binary
 *.ico binary
 *.db binary
 *.mp3 binary

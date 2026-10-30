@@ -328,6 +328,12 @@ class TestConfig:
         client.post("/api/config", json={"tema": "cobre"})
         assert b'<html lang="es" data-tema="cobre">' in client.get("/").data
 
+    def test_la_configuracion_dice_la_version(self, client):
+        from sonora import __version__
+
+        html = client.get("/").get_data(as_text=True)
+        assert f"Sonora {__version__} ·" in html[html.index('id="vista-configuracion"'):]
+
     def test_el_selector_de_tema_vive_en_la_vista_de_configuracion(self):
         html = (RUTA_RECURSOS / "templates" / "index.html").read_text(encoding="utf-8")
         assert 'id="temas"' not in html[: html.index("</aside>")]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from flask import Blueprint, render_template
 
-from .. import db
+from .. import __version__, db
 from .config import normalizar_tema
 
 bp = Blueprint("vistas", __name__)
@@ -19,4 +19,4 @@ def index():
     el de fábrica y saltaría al elegido.
     """
     tema = normalizar_tema(db.config_obtener("tema", ""))
-    return render_template("index.html", tema=tema)
+    return render_template("index.html", tema=tema, version=__version__)

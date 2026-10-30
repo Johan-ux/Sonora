@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def ahora_iso() -> str:
@@ -13,7 +13,7 @@ def ahora_iso() -> str:
     horario o de zona) el orden lexicográfico no coincidiría con el temporal.
     El frontend la convierte a hora local al mostrarla (new Date + toLocale…).
     """
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def formatear_duracion(segundos) -> str:

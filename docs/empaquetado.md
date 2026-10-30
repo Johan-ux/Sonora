@@ -19,12 +19,14 @@ falta y ejecuta [`scripts/construir.py`](../scripts/construir.py), que:
 2. **Ejecuta PyInstaller** con [`scripts/sonora.spec`](../scripts/sonora.spec).
 3. **Añade las licencias** de todo lo que va dentro en `dist/Sonora/licencias/`
    (ver más abajo).
-4. **Comprime** la carpeta en `dist/Sonora-windows-x64.zip`.
+4. **Comprime** la carpeta en `dist/Sonora-windows-x64.zip` y deja al lado su
+   huella SHA-256, en el formato de `sha256sum`.
 
-| Resultado                    | Qué es                                       |
-| ---------------------------- | -------------------------------------------- |
-| `dist/Sonora/Sonora.exe`     | La app, lista para abrir                     |
-| `dist/Sonora-windows-x64.zip` | Lo que se reparte (unos 145 MB; 330 MB al descomprimir) |
+| Resultado                            | Qué es                                                  |
+| ------------------------------------ | ------------------------------------------------------- |
+| `dist/Sonora/Sonora.exe`             | La app, lista para abrir                                |
+| `dist/Sonora-windows-x64.zip`        | Lo que se reparte (unos 145 MB; 330 MB al descomprimir) |
+| `dist/Sonora-windows-x64.zip.sha256` | Su huella, para comprobar la descarga                   |
 
 Las carpetas `build/` y `dist/` son regenerables y están ignoradas por git.
 
@@ -40,13 +42,25 @@ Para cambiar de versión se tocan la URL y la huella en `DESCARGAS`
 
 ## Publicar una versión
 
-[`.github/workflows/publicar.yml`](../.github/workflows/publicar.yml) construye
-el zip en Windows y lo sube a **Releases** al empujar una etiqueta `v…`:
+La versión vive en un solo sitio, `__version__` en
+[`sonora/__init__.py`](../sonora/__init__.py), y de ahí la toman las
+propiedades del `.exe` (las que enseña el Explorador) y la vista de
+Configuración. Para publicar una:
 
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+1. Sube `__version__` siguiendo [versionado semántico](https://semver.org/lang/es/).
+2. En [`CHANGELOG.md`](../CHANGELOG.md), convierte «Sin publicar» en la sección
+   de esa versión, con su fecha.
+3. Crea la etiqueta y súbela:
+
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+
+[`.github/workflows/publicar.yml`](../.github/workflows/publicar.yml) comprueba
+que la etiqueta coincide con `__version__` y que el changelog tiene su sección,
+pasa los tests, construye el zip en Windows y crea la release con el zip, su
+huella y las notas de esa versión del changelog.
 
 También se puede lanzar a mano desde la pestaña *Actions* (*Run workflow*): en
 ese caso el zip queda como artefacto de la ejecución, sin crear release.

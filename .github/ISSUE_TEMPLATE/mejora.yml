@@ -1,0 +1,25 @@
+name: Proponer una mejora
+description: Una función nueva o un cambio en una que ya existe.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qué problema resuelve
+      description: Qué querías hacer y por qué hoy no se puede, o cuesta.
+    validations:
+      required: true
+
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Cómo te lo imaginas
+      description: Cómo funcionaría desde el punto de vista de quien usa la app.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas
+      description: Otras formas de resolverlo que hayas pensado, si las hay.

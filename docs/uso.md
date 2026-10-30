@@ -23,6 +23,8 @@ por completo.
 
 ## De un vistazo
 
+![La biblioteca de Sonora con cuatro pistas y una sonando a medias en la barra de reproducción](img/biblioteca.png)
+
 - **Buscar**: escribe y pulsa Enter (o pega una URL). Cada resultado lleva al
   pie su botón **＋ Añadir** para ponerlo en la cola; con playlists puedes
   añadir **todo** o por **lotes de 100**. Encima de los resultados están los

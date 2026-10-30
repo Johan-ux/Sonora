@@ -17,11 +17,44 @@
 # - console=False porque es una app de ventana (pywebview); no queremos consola.
 
 import os
+import re
 
 from PyInstaller.utils.hooks import collect_submodules, copy_metadata
+from PyInstaller.utils.win32.versioninfo import (
+    FixedFileInfo,
+    StringFileInfo,
+    StringStruct,
+    StringTable,
+    VarFileInfo,
+    VarStruct,
+    VSVersionInfo,
+)
 
 # Raíz del repositorio (carpeta padre de scripts/).
 RAIZ = os.path.abspath(os.path.join(SPECPATH, os.pardir))
+
+# Propiedades del .exe (las que enseñan el Explorador y el Administrador de
+# tareas), con la versión de sonora/__init__.py.
+with open(os.path.join(RAIZ, 'sonora', '__init__.py'), encoding='utf-8') as fichero:
+    VERSION = re.search(r'^__version__ = "([^"]+)"', fichero.read(), re.M).group(1)
+NUMEROS = tuple(int(n) for n in re.findall(r'\d+', VERSION)[:3])
+NUMEROS += (0,) * (4 - len(NUMEROS))
+PROPIEDADES = VSVersionInfo(
+    ffi=FixedFileInfo(filevers=NUMEROS, prodvers=NUMEROS),
+    kids=[
+        # 0C0A04B0: español (alfabetización internacional), en Unicode.
+        StringFileInfo([StringTable('0C0A04B0', [
+            StringStruct('ProductName', 'Sonora'),
+            StringStruct('FileDescription', 'Sonora'),
+            StringStruct('ProductVersion', VERSION),
+            StringStruct('FileVersion', VERSION),
+            StringStruct('InternalName', 'Sonora'),
+            StringStruct('OriginalFilename', 'Sonora.exe'),
+            StringStruct('LegalCopyright', 'Copyright (c) 2026 Johan-ux. Licencia MIT.'),
+        ])]),
+        VarFileInfo([VarStruct('Translation', [0x0C0A, 1200])]),
+    ],
+)
 
 # Programas que acompañan al ejecutable. Sin ellos saldría un .exe que solo
 # funciona donde ya estén instalados: mejor no construirlo.
@@ -101,6 +134,7 @@ exe = EXE(
     entitlements_file=None,
     # El mismo icono que usa la ventana (lo genera scripts/generar_icono.py).
     icon=os.path.join(RAIZ, 'sonora', 'static', 'img', 'sonora.ico'),
+    version=PROPIEDADES,
 )
 
 coll = COLLECT(

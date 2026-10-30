@@ -45,16 +45,26 @@ datos/                     Datos locales en desarrollo (ignorada por git)
 ├── yt-dlp/                Solo en el .exe: el yt-dlp descargado por la app
 └── biblioteca.db          SQLite: cola, historial y preferencias
 
-docs/                      Esta documentación
+docs/                      Esta documentación (img/: logo y capturas del README)
 ejemplos/urls.example.txt  Fichero de URLs de ejemplo para la CLI
 scripts/                   iniciar.bat, construir.py (+ construir_exe.bat), sonora.spec
                            y generar_icono.py
-tests/                     Suite de pytest (paths, db, utils, ydl_opts, API)
-.github/workflows/ci.yml   CI: tests en Ubuntu y Windows
-.github/workflows/publicar.yml  Construye el zip para Windows y lo publica en Releases
-pyproject.toml             Configuración de herramientas (pytest)
+tests/                     Suite de pytest
+.github/
+├── workflows/ci.yml       CI: lint y tests en Ubuntu y Windows, Python 3.11 y 3.14
+├── workflows/publicar.yml Construye el zip para Windows y crea la release
+├── ISSUE_TEMPLATE/        Formularios para fallos y propuestas
+├── PULL_REQUEST_TEMPLATE.md
+├── dependabot.yml         Avisos mensuales de versiones nuevas (actions y pip)
+└── CODEOWNERS
+CHANGELOG.md               Cambios de cada versión (Keep a Changelog)
+CONTRIBUTING.md            Cómo preparar el entorno y mandar cambios
+CODE_OF_CONDUCT.md         Código de conducta (Contributor Covenant 2.1)
+SECURITY.md                Cómo avisar de una vulnerabilidad
+.editorconfig              Formato común para cualquier editor
+pyproject.toml             Configuración de herramientas (pytest y ruff)
 requirements.txt           Dependencias de la app
-requirements-dev.txt       Dependencias de desarrollo (pytest)
+requirements-dev.txt       Dependencias de desarrollo (pytest y ruff)
 ```
 
 ## Decisiones de diseño
@@ -141,5 +151,6 @@ reclamo atómico de ítems del worker), los helpers y el contrato de la API HTTP
 (sin tocar la red). Los tests no arrancan nunca el worker de descargas ni salen
 a internet, y usan una BD temporal por test.
 
-En GitHub, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) ejecuta los
-tests en Ubuntu y Windows con cada push.
+En GitHub, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) ejecuta el
+linter y los tests en Ubuntu y Windows, con Python 3.11 (la mínima) y 3.14 (la
+del `.exe`), en cada push a `master` y en cada pull request.

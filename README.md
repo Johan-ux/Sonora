@@ -1,122 +1,134 @@
-# Sonora — Reproductor y gestor de descargas de música
+<p align="center">
+  <img src="docs/img/logo.png" alt="" width="96" height="96">
+</p>
 
-**Sonora** es una **app de escritorio** (ventana propia, no el navegador) para
-descargar música de YouTube a **MP3 de alta calidad** y reproducirla desde tu
-propia biblioteca local. Interfaz negra con el acento en degradado (nueve
-temas de color a elegir), con tres piezas en una sola ventana:
+<h1 align="center">Sonora</h1>
 
-- 🔎 **Buscador integrado** de YouTube (texto, URLs, playlists y canales).
-- ⬇️ **Gestor de descargas** a MP3 (hasta 320 kbps) con progreso en vivo,
-  lotes, cancelación y reintentos.
-- 🎧 **Reproductor + biblioteca** con aleatorio, repetición y control por
-  teclas multimedia.
+<p align="center">
+  Busca música en YouTube, descárgala en MP3 de alta calidad y escúchala desde tu propia biblioteca.<br>
+  Una app de escritorio para Windows que se abre sin instalar nada.
+</p>
 
-Construida con **Python + Flask + pywebview** y empaquetada a un `.exe` con
-**PyInstaller**.
+<p align="center">
+  <a href="https://github.com/Johan-ux/Sonora/releases/latest"><img alt="Última versión" src="https://img.shields.io/github/v/release/Johan-ux/Sonora?label=versi%C3%B3n"></a>
+  <a href="https://github.com/Johan-ux/Sonora/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Johan-ux/Sonora/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="Licencia MIT" src="https://img.shields.io/github/license/Johan-ux/Sonora?label=licencia"></a>
+  <img alt="Windows 10 y 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6">
+  <img alt="Python 3.11 o posterior" src="https://img.shields.io/badge/python-3.11%2B-3776AB">
+</p>
 
-> ⚠️ Proyecto de uso **personal y privado**. No es comercial.
+<p align="center">
+  <a href="https://github.com/Johan-ux/Sonora/releases/latest/download/Sonora-windows-x64.zip"><b>⬇️ Descargar para Windows</b></a>
+  ·
+  <a href="docs/uso.md">Guía de uso</a>
+  ·
+  <a href="CHANGELOG.md">Novedades</a>
+</p>
+
+<p align="center">
+  <img src="docs/img/captura.png" alt="Sonora con los resultados de una búsqueda: miniaturas, títulos y duración de cada vídeo, y la barra de reproducción abajo" width="900">
+</p>
 
 ---
 
-## ⬇️ Descargar y usar (Windows, sin instalar nada)
+## Empezar
 
-1. Descarga `Sonora-windows-x64.zip` de la página de **Releases**.
+1. Descarga [`Sonora-windows-x64.zip`](https://github.com/Johan-ux/Sonora/releases/latest/download/Sonora-windows-x64.zip)
+   de la última versión.
 2. Descomprímelo (clic derecho → *Extraer todo*).
 3. Abre `Sonora\Sonora.exe`.
 
-Lleva dentro todo lo que necesita (ffmpeg y el runtime de JavaScript), y
-yt-dlp se actualiza desde la propia app. Al ser un `.exe` sin firmar, la
-primera vez Windows puede decir «Windows protegió su PC»: **Más información →
-Ejecutar de todas formas**.
+Lleva dentro todo lo que necesita (ffmpeg y el runtime de JavaScript), y yt-dlp
+se actualiza desde la propia app. Funciona en Windows 10 y 11 de 64 bits.
 
-## 🚀 Desde el código
+> Al ser un `.exe` sin firmar, la primera vez Windows puede decir «Windows
+> protegió su PC»: **Más información → Ejecutar de todas formas**. Si quieres
+> comprobar la descarga, cada versión publica la huella SHA-256 del zip.
 
-```bash
-# 1) Dependencias (requiere ffmpeg instalado en el sistema)
-python -m venv .venv
-.venv\Scripts\activate        # Linux/macOS: source .venv/bin/activate
-pip install -r requirements.txt
-
-# 2) Arrancar la app
-python -m sonora              # en Windows también: scripts\iniciar.bat
-```
-
-Guía detallada en [docs/instalacion.md](docs/instalacion.md).
-
----
-
-## 📚 Documentación
-
-| Documento                            | Contenido                                                |
-| ------------------------------------ | -------------------------------------------------------- |
-| [Instalación](docs/instalacion.md)   | Requisitos, ffmpeg, dependencias y dónde viven tus datos |
-| [Uso](docs/uso.md)                   | Arranque, recorrido por la interfaz y atajos de teclado  |
-| [CLI](docs/cli.md)                   | Descarga por lotes desde la terminal y cookies           |
-| [Empaquetado](docs/empaquetado.md)   | Construir y publicar el `.exe` que no necesita instalar nada |
-| [Arquitectura](docs/arquitectura.md) | Estructura del proyecto, decisiones de diseño, tests     |
-
----
-
-## ✨ Funciones
+## Funciones
 
 - 🔎 **Buscador integrado**: busca por canción o artista, o pega una URL de
   vídeo, **playlist**, **canal** o **Mix** de YouTube. Con **filtros** como
   los de YouTube: orden (también por más recientes), fecha de subida,
   duración, tipo y características (4K, HD, subtítulos…).
-- 📥 **Cola persistente**: sobrevive al reinicio (SQLite). Elige carpeta de
-  destino y calidad; las preferencias **se recuerdan**.
-- 🚦 **Gestión completa de descargas**: progreso en vivo por canción,
-  **cancelar** la descarga en curso, **reintentar** las fallidas (una a una o
+- 👂 **Vista previa**: escucha o mira un resultado antes de decidir si lo
+  descargas.
+- 📥 **Cola persistente**: sobrevive al reinicio. Elige carpeta de destino y
+  calidad; las preferencias **se recuerdan**.
+- 🚦 **Descargas bajo control**: progreso en vivo por canción, varias a la vez,
+  **cancelar** la que está en curso, **reintentar** las fallidas (una a una o
   todas), lotes plegables para playlists grandes y aviso de duplicados.
-- 🎵 **MP3 de calidad**: bitrate configurable (128/192/256/**320** kbps) con
-  **carátula** y **metadatos** incrustados. Los nombres de archivo incluyen el
-  id del vídeo para que dos canciones con el mismo título no se pisen.
-- 📚 **Biblioteca**: explora por carpetas, filtra al instante (los tags se
-  cachean: rápido incluso con cientos de MP3).
-- ▶️ **Reproductor**: play/pausa, anterior/siguiente, **aleatorio**,
-  **repetir (lista/pista)**, barra de progreso, volumen persistente, teclas
-  multimedia del sistema y atajos (espacio = play/pausa, `/` = buscar).
-- 🎬 **Vídeo**: los MP4 de la biblioteca y la vista previa del buscador se ven
-  en una ventana flotante que se mueve y se redimensiona a mano, en modo teatro
-  o a pantalla completa; los de la biblioteca, con controles propios (posición,
-  volumen y velocidad).
-- 🕑 **Historial** de descargas completadas.
+- 🎵 **MP3 de calidad**: de 128 a **320 kbps**, con **carátula** y
+  **metadatos** incrustados. También vídeo en MP4, hasta 4K.
+- 📚 **Biblioteca**: explora por carpetas y filtra al instante, rápida incluso
+  con cientos de canciones.
+- ▶️ **Reproductor**: aleatorio, **repetir (lista/pista)**, volumen que se
+  recuerda, teclas multimedia del sistema y atajos de teclado.
+- 🎬 **Vídeo**: una ventana flotante que se mueve y se redimensiona a mano, con
+  modo teatro y pantalla completa.
+- 🎨 **Nueve temas de color** sobre una interfaz negra.
 - ♿ **Accesible**: navegación por teclado completa, foco visible, lectores de
-  pantalla (live regions), contraste AA y respeto de `prefers-reduced-motion`.
+  pantalla, contraste AA y respeto de «reducir movimiento».
 - 🖥️ **CLI incluida**: descarga por lotes desde la terminal con
   `python -m sonora.cli urls.txt`.
 
----
+## Desde el código
 
-## 📁 Estructura
-
-```text
-sonora/       Paquete principal: app de escritorio (__main__, escritorio) y CLI (cli),
-              con api/ (blueprints HTTP), servicios/ (lógica), db.py, templates/ y static/
-datos/        Tus datos en desarrollo: descargas/ + biblioteca.db (fuera de git)
-docs/         Documentación
-ejemplos/     Ficheros de ejemplo (urls.example.txt para la CLI)
-scripts/      iniciar.bat, construir.py + construir_exe.bat, sonora.spec (PyInstaller)
-              y generar_icono.py
-tests/        Suite de pytest
-```
-
-Detalle completo en [docs/arquitectura.md](docs/arquitectura.md).
-
----
-
-## 🧪 Tests
+Necesitas **Python 3.11 o posterior** y **ffmpeg** instalado en el sistema.
 
 ```bash
-pip install -r requirements-dev.txt
-python -m pytest -q
+python -m venv .venv
+.venv\Scripts\activate        # Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+
+python -m sonora              # en Windows también: scripts\iniciar.bat
 ```
 
----
+Para construir el `.exe` tú mismo: `scripts\construir_exe.bat` (ver
+[empaquetado](docs/empaquetado.md)).
 
-## 📄 Aviso legal
+## Documentación
 
-Usa esta herramienta únicamente con contenido para el que tengas derechos o
-permiso, y respeta los Términos de Servicio de YouTube y la legislación
-aplicable sobre derechos de autor. Código bajo licencia MIT (ver
-[`LICENSE`](LICENSE)).
+| Documento                            | Contenido                                                    |
+| ------------------------------------ | ------------------------------------------------------------ |
+| [Instalación](docs/instalacion.md)   | Requisitos, ffmpeg, dependencias y dónde viven tus datos     |
+| [Uso](docs/uso.md)                   | Recorrido por la interfaz y atajos de teclado                |
+| [CLI](docs/cli.md)                   | Descarga por lotes desde la terminal y cookies               |
+| [Empaquetado](docs/empaquetado.md)   | Construir y publicar el `.exe` que no necesita instalar nada |
+| [Arquitectura](docs/arquitectura.md) | Estructura del proyecto, decisiones de diseño y tests        |
+
+## Contribuir
+
+Los fallos y las ideas, en [issues](https://github.com/Johan-ux/Sonora/issues/new/choose).
+Para mandar cambios, [CONTRIBUTING.md](CONTRIBUTING.md) explica cómo preparar
+el entorno, pasar los tests y escribir los commits. Al participar aceptas el
+[código de conducta](CODE_OF_CONDUCT.md).
+
+¿Has encontrado un problema de seguridad? No abras un issue: sigue
+[SECURITY.md](SECURITY.md).
+
+## Construida con
+
+[yt-dlp](https://github.com/yt-dlp/yt-dlp) ·
+[FFmpeg](https://ffmpeg.org) ·
+[Deno](https://deno.com) ·
+[Flask](https://flask.palletsprojects.com) ·
+[pywebview](https://pywebview.flowrl.com) ·
+[mutagen](https://github.com/quodlibet/mutagen) ·
+[PyInstaller](https://pyinstaller.org)
+
+## Aviso legal
+
+Sonora es un proyecto personal y sin ánimo de lucro, sin relación con YouTube
+ni con Google. Úsala solo con contenido para el que tengas derechos o permiso,
+y respeta los Términos de Servicio de YouTube y la legislación sobre derechos
+de autor que te aplique.
+
+Las miniaturas de las capturas son vídeos de
+[Blender Studio](https://studio.blender.org), que publica sus películas
+abiertas con licencia CC BY.
+
+## Licencia
+
+[MIT](LICENSE) © Johan-ux. El ejecutable incluye software de terceros con sus
+propias licencias, que van en su carpeta `licencias/`.

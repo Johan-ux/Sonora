@@ -13,6 +13,7 @@ Pasos:
    que va dentro. Repartir ffmpeg y mutagen (GPL) obliga a acompañarlos de su
    licencia y de dónde conseguir su código.
 4. Comprime la carpeta en ``dist/Sonora-windows-x64.zip``: es lo que se reparte.
+   Al lado deja su huella SHA-256 (``.zip.sha256``), para comprobar la descarga.
 
 Para cambiar de versión de ffmpeg o deno se tocan la URL y la huella en
 ``DESCARGAS`` (las huellas las publica GitHub junto a cada fichero).
@@ -22,6 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.metadata
+import re
 import shutil
 import subprocess
 import sys
@@ -86,6 +88,12 @@ DESCARGAS = (
 
 # Nombres con los que los paquetes de Python publican sus licencias.
 PREFIJOS_LICENCIA = ("LICENSE", "LICENCE", "COPYING", "NOTICE", "AUTHORS")
+
+
+def version_sonora() -> str:
+    """La versión de ``sonora/__init__.py``, sin importar el paquete."""
+    texto = (RAIZ / "sonora" / "__init__.py").read_text(encoding="utf-8")
+    return re.search(r'^__version__ = "([^"]+)"', texto, re.M).group(1)
 
 
 def _huella(ruta: Path) -> str:
@@ -196,7 +204,7 @@ def escribir_licencias(destino: Path) -> None:
 
     version_python = ".".join(map(str, sys.version_info[:3]))
     (destino / "LEEME.txt").write_text(
-        "Sonora se distribuye bajo licencia MIT (Sonora-LICENSE.txt).\n"
+        f"Sonora {version_sonora()} se distribuye bajo licencia MIT (Sonora-LICENSE.txt).\n"
         f"Código fuente: {REPOSITORIO}\n"
         "\n"
         "Este programa incluye software de terceros, cada uno con su licencia:\n"
@@ -228,8 +236,15 @@ def main() -> int:
     carpeta = DIST / "Sonora"
     escribir_licencias(carpeta / "licencias")
     print("Comprimiendo...")
-    archivo = shutil.make_archive(str(DIST / NOMBRE_ZIP), "zip", root_dir=DIST, base_dir="Sonora")
-    print(f"\nListo:\n  {carpeta / 'Sonora.exe'}\n  {archivo}")
+    archivo = Path(
+        shutil.make_archive(str(DIST / NOMBRE_ZIP), "zip", root_dir=DIST, base_dir="Sonora")
+    )
+    # Mismo formato que sha256sum, para que se pueda comprobar con él.
+    huella = archivo.with_name(archivo.name + ".sha256")
+    huella.write_text(f"{_huella(archivo)}  {archivo.name}\n", encoding="utf-8")
+    print(f"\nListo (Sonora {version_sonora()}):")
+    for ruta in (carpeta / "Sonora.exe", archivo, huella):
+        print(f"  {ruta}")
     return 0
 
 

@@ -1,0 +1,9 @@
+# Sin issues en blanco: las plantillas piden lo necesario para reproducir un fallo.
+blank_issues_enabled: false
+contact_links:
+  - name: Documentación
+    url: https://github.com/Johan-ux/Sonora/tree/master/docs
+    about: Instalación, uso, CLI y empaquetado.
+  - name: Avisar de un problema de seguridad
+    url: https://github.com/Johan-ux/Sonora/security/advisories/new
+    about: En privado, no en un issue público (ver SECURITY.md).

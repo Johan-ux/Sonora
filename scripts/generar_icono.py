@@ -90,7 +90,7 @@ def _color_degradado(x: float, y: float) -> tuple[float, float, float]:
     abajo = max(barra[2] for barra in BARRAS)
     t = ((x - min(xs)) / (max(xs) - min(xs)) + (y - arriba) / (abajo - arriba)) / 2
     t = _limitar(t, 0.0, 1.0)
-    return tuple(a + (b - a) * t for a, b in zip(OCASO_A, OCASO_B))
+    return tuple(a + (b - a) * t for a, b in zip(OCASO_A, OCASO_B, strict=True))
 
 
 def dibujar(lado: int) -> list[list[tuple[int, int, int, int]]]:
@@ -110,7 +110,7 @@ def dibujar(lado: int) -> list[list[tuple[int, int, int, int]]]:
             alfa = _limitar(0.5 - _distancia_fondo(x, y) * escala, 0.0, 1.0)
             barra = _limitar(0.5 - _distancia_barras(barras, px + 0.5, py + 0.5), 0.0, 1.0)
             color = _color_degradado(x, y)
-            rgb = tuple(round(f + (c - f) * barra) for f, c in zip(FONDO, color))
+            rgb = tuple(round(f + (c - f) * barra) for f, c in zip(FONDO, color, strict=True))
             fila.append((*rgb, round(alfa * 255)))
         filas.append(fila)
     return filas
@@ -166,7 +166,7 @@ def construir_ico() -> bytes:
 
     salida = bytearray(struct.pack("<HHH", 0, 1, len(TAMANOS)))
     posicion = 6 + 16 * len(TAMANOS)
-    for lado, imagen in zip(TAMANOS, imagenes):
+    for lado, imagen in zip(TAMANOS, imagenes, strict=True):
         # En la entrada, 0 significa 256.
         medida = lado % 256
         salida += struct.pack("<BBBBHHII", medida, medida, 0, 0, 1, 32, len(imagen), posicion)
