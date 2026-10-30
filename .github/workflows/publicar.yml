@@ -39,9 +39,7 @@ jobs:
             echo "::error::La etiqueta $GITHUB_REF_NAME no coincide con la versión de sonora/__init__.py ($version)."
             exit 1
           fi
-          # De su «## [versión]» hasta la siguiente sección o los enlaces del final.
-          awk -v v="$version" 'index($0, "## [" v "]") == 1 {dentro=1; next} dentro && (/^## \[/ || /^\[[^]]*\]: /) {exit} dentro' CHANGELOG.md > notas.md
-          if ! grep -q '[^[:space:]]' notas.md; then
+          if ! python scripts/notas_version.py "$version" > notas.md; then
             echo "::error::CHANGELOG.md no tiene la sección [$version]."
             exit 1
           fi

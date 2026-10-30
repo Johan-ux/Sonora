@@ -47,8 +47,8 @@ datos/                     Datos locales en desarrollo (ignorada por git)
 
 docs/                      Esta documentación (img/: logo y capturas del README)
 ejemplos/urls.example.txt  Fichero de URLs de ejemplo para la CLI
-scripts/                   iniciar.bat, construir.py (+ construir_exe.bat), sonora.spec
-                           y generar_icono.py
+scripts/                   iniciar.bat, construir.py (+ construir_exe.bat), sonora.spec,
+                           notas_version.py (notas de la release) y generar_icono.py
 tests/                     Suite de pytest
 .github/
 ├── workflows/ci.yml       CI: lint y tests en Ubuntu y Windows, Python 3.11 y 3.14
