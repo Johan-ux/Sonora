@@ -153,4 +153,4 @@ a internet, y usan una BD temporal por test.
 
 En GitHub, [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) ejecuta el
 linter y los tests en Ubuntu y Windows, con Python 3.11 (la mínima) y 3.14 (la
-del `.exe`), en cada push a `master` y en cada pull request.
+del `.exe`), en cada push a `main` y en cada pull request.

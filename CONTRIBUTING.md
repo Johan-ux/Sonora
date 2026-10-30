@@ -73,7 +73,7 @@ Tipos habituales: `feat`, `fix`, `docs`, `refactor`, `test`, `ci` y `chore`.
 
 ## Pull requests
 
-1. Crea una rama desde `master` (`fix/...`, `feat/...`).
+1. Crea una rama desde `main` (`fix/...`, `feat/...`).
 2. Un _pull request_ por cambio; mejor pequeño que enorme.
 3. Si cambia algo que nota quien usa la app, añádelo a la sección
    «Sin publicar» de [CHANGELOG.md](CHANGELOG.md).

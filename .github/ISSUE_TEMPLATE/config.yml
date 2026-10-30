@@ -2,7 +2,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Documentación
-    url: https://github.com/Johan-ux/Sonora/tree/master/docs
+    url: https://github.com/Johan-ux/Sonora/tree/main/docs
     about: Instalación, uso, CLI y empaquetado.
   - name: Avisar de un problema de seguridad
     url: https://github.com/Johan-ux/Sonora/security/advisories/new
