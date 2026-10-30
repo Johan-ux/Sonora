@@ -47,7 +47,9 @@ jobs:
 
           ---
 
-          **Para usarla:** descarga `Sonora-windows-x64.zip`, descomprímelo y abre `Sonora\Sonora.exe` (Windows 10 u 11 de 64 bits; no hace falta instalar nada). `Sonora-windows-x64.zip.sha256` es su huella SHA-256.
+          **En Windows:** descarga `Sonora-windows-x64.zip`, descomprímelo y abre `Sonora\Sonora.exe` (Windows 10 u 11 de 64 bits; no hace falta instalar nada). `Sonora-windows-x64.zip.sha256` es su huella SHA-256.
+
+          **En Linux y macOS** se usa desde el código: descarga el *Source code* de esta release, descomprímelo y ejecuta `sh scripts/iniciar.sh`, que lo prepara todo (hace falta Python 3.11 o posterior). Más detalles en la [guía de instalación](https://github.com/Johan-ux/Sonora/blob/main/docs/instalacion.md).
           EOF
 
       - name: Instalar dependencias
