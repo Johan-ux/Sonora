@@ -517,6 +517,28 @@ class TestBibliotecaEliminar:
         assert respuesta.status_code == 403
 
 
+class TestAbrirCarpeta:
+    """El explorador no se abre de verdad: ``carpetas_abiertas`` (conftest)."""
+
+    def test_sin_archivo_abre_la_carpeta_de_descargas(self, client, entorno, carpetas_abiertas):
+        assert client.post("/api/abrir-carpeta", json={}).status_code == 200
+        assert carpetas_abiertas == [entorno]
+
+    def test_con_archivo_abre_la_carpeta_que_lo_contiene(
+        self, client, entorno, carpetas_abiertas
+    ):
+        (entorno / "rock").mkdir()
+        (entorno / "rock" / "tema.mp3").write_bytes(b"ID3fake")
+        respuesta = client.post("/api/abrir-carpeta", json={"archivo": "rock/tema.mp3"})
+        assert respuesta.status_code == 200
+        assert carpetas_abiertas == [(entorno / "rock").resolve()]
+
+    def test_no_abre_nada_fuera_de_descargas(self, client, entorno, carpetas_abiertas):
+        respuesta = client.post("/api/abrir-carpeta", json={"archivo": "../fuera.mp3"})
+        assert respuesta.status_code == 403
+        assert carpetas_abiertas == []
+
+
 # --------------------------------------------------------------------------- #
 # Altas con una tanda en marcha, reintentos y URLs de vídeo dentro de una lista
 # --------------------------------------------------------------------------- #

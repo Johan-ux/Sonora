@@ -110,6 +110,24 @@ def servir_media(rel: str):
     return _servir_media(rel)
 
 
+def abrir_en_explorador(destino: Path, carpeta: Path) -> None:
+    """Abre ``carpeta`` en el explorador del sistema.
+
+    Aparte del endpoint para que los tests la sustituyan (ver
+    ``tests/conftest.py``): si no, cada petición válida abriría una ventana.
+    """
+    if os.name == "nt":
+        if destino.is_file():
+            # En Windows abre el Explorador y selecciona el archivo.
+            subprocess.Popen(["explorer", "/select,", os.path.normpath(str(destino))])
+        else:
+            os.startfile(str(carpeta))
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(carpeta)])
+    else:
+        subprocess.Popen(["xdg-open", str(carpeta)])
+
+
 @bp.post("/api/abrir-carpeta")
 def abrir_carpeta():
     """Abre en el explorador del sistema la carpeta que contiene un archivo de
@@ -123,16 +141,7 @@ def abrir_carpeta():
     if not carpeta.exists():
         return error_json("Carpeta no encontrada.", 404)
     try:
-        if os.name == "nt":
-            if destino.is_file():
-                # En Windows abre el Explorador y selecciona el archivo.
-                subprocess.Popen(["explorer", "/select,", os.path.normpath(str(destino))])
-            else:
-                os.startfile(str(carpeta))
-        elif sys.platform == "darwin":
-            subprocess.Popen(["open", str(carpeta)])
-        else:
-            subprocess.Popen(["xdg-open", str(carpeta)])
+        abrir_en_explorador(destino, carpeta)
         return jsonify({"ok": True})
     except Exception as error:  # noqa: BLE001
         return error_json(f"No se pudo abrir la carpeta: {colapsar_error(error)}", 500)

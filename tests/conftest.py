@@ -121,6 +121,22 @@ def client(app):
 
 
 @pytest.fixture(autouse=True)
+def carpetas_abiertas(monkeypatch):
+    """Ningún test abre ventanas del explorador del sistema.
+
+    ``/api/abrir-carpeta`` las abre de verdad, y el guard de origen la llama
+    con una petición válida. Devuelve las carpetas que se habrían abierto.
+    """
+    from sonora.api import biblioteca
+
+    abiertas = []
+    monkeypatch.setattr(
+        biblioteca, "abrir_en_explorador", lambda destino, carpeta: abiertas.append(carpeta)
+    )
+    return abiertas
+
+
+@pytest.fixture(autouse=True)
 def _sin_reinicio_pendiente(monkeypatch):
     """Ningún test hereda el «falta reiniciar» que deja otro al actualizar yt-dlp.
 
