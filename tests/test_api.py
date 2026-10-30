@@ -397,6 +397,11 @@ class TestCarpetas:
     def test_crear_sin_nombre_devuelve_400(self, client):
         assert client.post("/api/carpetas/crear", json={}).status_code == 400
 
+    def test_crear_con_byte_nulo_devuelve_400(self, client):
+        # Antes llegaba a mkdir, que lanza ValueError: un 500 sin capturar.
+        respuesta = client.post("/api/carpetas/crear", json={"nombre": "a\x00b"})
+        assert respuesta.status_code == 400
+
     def test_listar_raiz(self, client, entorno):
         (entorno / "una").mkdir()
         datos = client.get("/api/carpetas").get_json()

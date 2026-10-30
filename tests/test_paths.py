@@ -63,6 +63,28 @@ def test_ruta_absoluta_inyectada(base):
         assert resultado is None or base in resultado.parents
 
 
+def test_carpeta_hermana_con_el_mismo_prefijo(base, tmp_path):
+    # 'descargas-otra' empieza como 'descargas', pero está fuera.
+    (tmp_path / "descargas-otra").mkdir()
+    assert resolver_dentro_descargas("../descargas-otra") is None
+    assert resolver_dentro_descargas("../descargas-otra/cancion.mp3") is None
+
+
+def test_enlace_que_sale_de_la_base(base, tmp_path):
+    fuera = tmp_path / "fuera"
+    fuera.mkdir()
+    try:
+        (base / "enlace").symlink_to(fuera, target_is_directory=True)
+    except OSError:
+        pytest.skip("este sistema no deja crear enlaces simbólicos")
+    assert resolver_dentro_descargas("enlace") is None
+    assert resolver_dentro_descargas("enlace/cancion.mp3") is None
+
+
+def test_byte_nulo_devuelve_none(base):
+    assert resolver_dentro_descargas("a\x00b") is None
+
+
 def test_rel_descargas_dentro_y_fuera(base, tmp_path):
     dentro = base / "sub" / "cancion.mp3"
     dentro.parent.mkdir(parents=True)

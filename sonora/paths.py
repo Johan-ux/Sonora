@@ -154,18 +154,25 @@ def resolver_dentro_descargas(rel: str) -> Path | None:
     Devuelve la ruta absoluta resuelta si es válida (no escapa de
     ``CARPETA_DESCARGAS``), o ``None`` si intenta salirse (path-traversal) o es
     inválida. Normaliza barras invertidas para tratar igual ``\\`` y ``/``.
+
+    Compara las rutas ya resueltas como texto, con ``startswith``: es la
+    comprobación que CodeQL reconoce como validación (``Path.parents`` no).
     """
     rel = (rel or "").strip().replace("\\", "/").strip("/")
-    base = CARPETA_DESCARGAS.resolve()
+    # En Windows realpath acepta el byte nulo y la ruta fallaría después.
+    if "\x00" in rel:
+        return None
+    base = os.path.realpath(CARPETA_DESCARGAS)
     try:
-        candidato = (base / rel).resolve()
+        candidato = os.path.realpath(os.path.join(base, rel))
     except (OSError, ValueError):
         return None
     # Permitimos la propia base ('' -> base) y cualquier descendiente.
     if candidato == base:
-        return candidato
-    if base in candidato.parents:
-        return candidato
+        return Path(base)
+    # Con el separador final, 'descargas-otra' no pasa por estar en 'descargas'.
+    if candidato.startswith(os.path.join(base, "")):
+        return Path(candidato)
     return None
 
 
